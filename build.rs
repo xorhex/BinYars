@@ -1,0 +1,23 @@
+use std::path::PathBuf;
+
+fn main() {
+    let link_path = std::env::var_os("DEP_BINARYNINJACORE_PATH")
+        .expect("DEP_BINARYNINJACORE_PATH not specified");
+
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR specified");
+    let _out_dir_path = PathBuf::from(out_dir);
+
+    println!("cargo::rustc-link-lib=dylib=binaryninjacore");
+    println!("cargo::rustc-link-search={}", link_path.to_str().unwrap());
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        println!(
+            "cargo::rustc-link-arg=-Wl,-rpath,{0},-L{0}",
+            link_path.to_string_lossy()
+        );
+    }
+
+    println!("cargo::rerun-if-changed=src/templates");
+    minijinja_embed::embed_templates!("src/templates/dist/");
+}
