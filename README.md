@@ -18,7 +18,7 @@ Steps:
 
 - In the root of  the repo, run `cargo build --release`
 
-- Copy the `libbinyars.[so|dll|dyno]` file to the Binary Ninja plugin dir.  On linux this is under: `~/.binaryninja/plugins/`
+- Copy (or better yet symlink) the `libbinyars.[so|dll|dyno]` file to the Binary Ninja plugin dir.  On linux this is under: `~/.binaryninja/plugins/`
 
 **Python Component**
 
