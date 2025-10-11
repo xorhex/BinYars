@@ -50,7 +50,7 @@ These are all found in the right click menu in the project view.
   
   - **WARNING**: *This will reorganize the Binary Ninja Project folder structure and files, proceed with caution!*
   
-  - **Runs all of the compiled rules against all of the files in a project and then sorts them into folders based upon the metadata in the rule. Also makes the scan data available in the file's project description.
+  - Runs all of the compiled rules against all of the files in a project and then sorts them into folders based upon the metadata in the rule. Also makes the scan data available in the file's project description.
   
   - Recommend enabling `Delete Empty Project Folders` when using this feature.
   
