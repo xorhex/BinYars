@@ -56,7 +56,7 @@ These are all found in the right click menu in the project view.
   
   - Will save the scan results to the Binary Ninja's project metadata.
   
-  - ![](./pictures/BinYarsScanSort.mp4)
+  - https://github.com/user-attachments/assets/ca187cd6-f121-4b7c-902b-e593ec9942a5
 
 - Scanning Sage (Scan Only)
   
