@@ -2,7 +2,10 @@
 extern crate custom_error;
 
 use binaryninja::background_task::BackgroundTask;
-use binaryninja::command::{register_command_for_project, ProjectCommand};
+use binaryninja::binary_view::BinaryView;
+use binaryninja::command::{
+    register_command, register_command_for_project, Command, ProjectCommand,
+};
 use binaryninja::is_database;
 use binaryninja::logger::Logger;
 use binaryninja::metadata::Metadata;
@@ -92,13 +95,25 @@ fn plugin_init() {
         .with_level(LevelFilter::Debug)
         .init();
 
-    register_command_for_project(
+    register_command(
         &format!("{PLUGIN_NAME}\\Compile Rules"),
         "YaraX Rules",
         RuleCompileCommand {},
     );
+
     register_command_for_project(
-        &format!("{PLUGIN_NAME}\\Oracle of Order (Sort)"),
+        &format!("{PLUGIN_NAME}\\Brew (Compile)"),
+        "YaraX Rules",
+        ProjectRuleCompileCommand {},
+    );
+
+    register_command_for_project(
+        &format!("{PLUGIN_NAME}\\Scanning Sage (Scan Only)"),
+        "YaraX Scan Only",
+        ScanCommand {},
+    );
+    register_command_for_project(
+        &format!("{PLUGIN_NAME}\\Oracle of Order (Scan + Sort)"),
         "YaraX ALL The Things!",
         SortCommand {},
     );
@@ -108,9 +123,9 @@ fn plugin_init() {
 ************** Compile Yara-X Command ****************
 *****************************************************/
 
-struct RuleCompileCommand;
+struct ProjectRuleCompileCommand;
 
-impl ProjectCommand for RuleCompileCommand {
+impl ProjectCommand for ProjectRuleCompileCommand {
     fn action(&self, _proj: &Project) {
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
         let yara = yarax::Rules::new(PLUGIN_RULES_SERIALIZED_FILE, rule_folder.as_str());
@@ -131,6 +146,82 @@ impl ProjectCommand for RuleCompileCommand {
     fn valid(&self, proj: &Project) -> bool {
         proj.is_open()
     }
+}
+
+struct RuleCompileCommand;
+
+impl Command for RuleCompileCommand {
+    fn action(&self, _view: &BinaryView) {
+        let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+        let yara = yarax::Rules::new(PLUGIN_RULES_SERIALIZED_FILE, rule_folder.as_str());
+        spawn(move || {
+            let task = BackgroundTask::new("BinYars start", true);
+            let res = yara.compile_and_save(&task);
+            match res {
+                Ok(_) => task.finish(),
+                Err(e) => {
+                    log::error!("Error processing {PLUGIN_NAME} files: {e:?}");
+                    task.set_progress_text(&format!("{PLUGIN_NAME} Error: {e}"));
+                    task.finish();
+                }
+            }
+        });
+    }
+
+    fn valid(&self, _view: &BinaryView) -> bool {
+        true
+    }
+}
+
+/*****************************************************
+***************** San Only Command *******************
+*****************************************************/
+
+struct ScanCommand;
+
+impl ProjectCommand for ScanCommand {
+    fn action(&self, proj: &Project) {
+        log::info!("Scanning project: {}", proj.name());
+        let project = proj.to_owned();
+        let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+        spawn(move || {
+            let task = BackgroundTask::new("BinYars start", true);
+            let res = scanonly(&task, &project, &rule_folder);
+            match res {
+                Ok(_) => task.finish(),
+                Err(e) => {
+                    log::error!("Error processing {PLUGIN_NAME} files: {e:?}");
+                    task.set_progress_text(&format!("{PLUGIN_NAME} Error: {e}"));
+                    task.finish();
+                }
+            }
+        });
+    }
+
+    fn valid(&self, proj: &Project) -> bool {
+        proj.is_open()
+    }
+}
+
+fn scanonly(task: &BackgroundTask, proj: &Project, rule_folder: &str) -> anyhow::Result<()> {
+    task.set_progress_text(&format!("{} - Scanning Files Only", PLUGIN_NAME));
+    let hits = scan_project(task, proj, rule_folder);
+
+    if task.is_cancelled() {
+        log::info!("Task cancelled by user.");
+        return Ok(()); // exit early
+    }
+
+    // Store YaraX Results in the Project Metadata
+    task.set_progress_text(&format!(
+        "{} - Storing YaraX results to the project metadata",
+        PLUGIN_NAME
+    ));
+    let result_meta = get_all_meta_file_rules(&hits);
+    save_results_to_project_metadata(proj, result_meta);
+
+    log::info!("BinYars execution complete!");
+    Ok(())
 }
 
 /*****************************************************
@@ -321,14 +412,6 @@ fn sort_by_rule_folder_name(
         return Ok(()); // exit early
     }
 
-    task.set_progress_text(&format!("{} - Moving Unmatched Files", PLUGIN_NAME));
-    move_unmatched_file_to_root_dir(&proj, &hits);
-
-    if task.is_cancelled() {
-        log::info!("Task cancelled by user.");
-        return Ok(()); // exit early
-    }
-
     // Move the bndb files to be next to their corrisponding binary
     task.set_progress_text(&format!("{} - Moving BNDB Files", PLUGIN_NAME));
     move_bndb_files_to_binary_file_location(&proj);
@@ -340,6 +423,14 @@ fn sort_by_rule_folder_name(
 
     // Remove any empty folder is the option is selected
     if remove_empty_folders_setting {
+        task.set_progress_text(&format!("{} - Moving Unmatched Files", PLUGIN_NAME));
+        move_unmatched_file_to_root_dir(&proj, &hits);
+
+        if task.is_cancelled() {
+            log::info!("Task cancelled by user.");
+            return Ok(()); // exit early
+        }
+
         log::info!(
             "Remove empty folders setting is {}, so removing empty folders",
             remove_empty_folders_setting
@@ -514,7 +605,7 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
         let finished = counter.fetch_add(1, Ordering::SeqCst) + 1;
         let percent = (finished * 100) / total.max(1);
         task.set_progress_text(&format!(
-            "{} - File Creation {}% complete",
+            "{} - Sorting into Folders {}% complete",
             PLUGIN_NAME, percent
         ));
     });

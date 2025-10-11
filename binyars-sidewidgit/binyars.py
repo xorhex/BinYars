@@ -836,7 +836,7 @@ class QScanResultSelectedSection(QWidget):
             if idx < len(console_groups) - 1:
                 self.add_separator()
 
-        if len(identifiers) > 0:
+        if len(identifiers) > 0 and len(console_groups) > 0:
             self.add_separator()
 
         logger.log_debug(f"Identifiers {identifiers}")

@@ -15,10 +15,6 @@ walkdir = "2.5.0"
 serde = { version="1.0.219" , features=["derive"]}
 serde_json = "1.0.142"
 custom_error = "1.9.2"
-base64 = "0.22.1"
-# For reports
-minijinja = "2.10.2"
-minijinja-embed = "2.10.2"
 open = "5"  
 rusqlite = "0.37.0"
 anyhow = "1.0.99"
@@ -31,6 +27,3 @@ yara-x-fmt = "1.7.1"
 
 [lib]
 crate-type = ["cdylib"]
-
-[build-dependencies]
-minijinja-embed = "2.10.2"

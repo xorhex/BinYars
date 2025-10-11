@@ -68,6 +68,6 @@ if not register_settings():
 
 
 #################################################
-# Basic Emulation Using Unicorn in a sidebar
+# Binary Ninja BinYars Sidebar Widget
 #################################################
 Sidebar.addSidebarWidgetType(BinYarsSidebarWidgetType())

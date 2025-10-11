@@ -17,7 +17,4 @@ fn main() {
             link_path.to_string_lossy()
         );
     }
-
-    println!("cargo::rerun-if-changed=src/templates");
-    minijinja_embed::embed_templates!("src/templates/dist/");
 }

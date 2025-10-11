@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QRect, QSize, Signal
+from PySide6.QtCore import Qt, QRect, QSize, Signal, QEvent
 from PySide6.QtGui import (
     QColor,
     QPainter,
@@ -120,7 +120,7 @@ class CodeEditor(QPlainTextEdit):
 
         self.updateLineNumberAreaWidth(0)
         # nice monospace font
-        self.setFont(QFont("Courier", 11))
+        self.setFont(QFont("Courier", 12))
         self._currentLine = -1  # track highlighted line
 
         self.textChanged.connect(self._onTextChanged)
@@ -249,8 +249,9 @@ class CodeEditor(QPlainTextEdit):
 
             fmt = QTextCharFormat()
             if match_pos is not None:
-                fmt.setBackground(QColor("#ffff00"))  # yellow highlight
-                fmt.setForeground(QColor("black"))
+                # fmt.setBackground(QColor("#ffff00"))  # yellow highlight
+                # fmt.setForeground(QColor("black"))
+                fmt.setForeground(QColor("yellow"))
                 for p in (pos, match_pos):
                     cur = QTextCursor(self.document())
                     cur.setPosition(p)
@@ -531,6 +532,42 @@ class YaraHighlighter(QSyntaxHighlighter):
             "true",
             "false",
             "with",
+            "icontains",
+            "contains",
+            "wide",
+            "ascii",
+            "all",
+            "int32",
+            "none",
+            "them",
+            "endswith",
+            "int32be",
+            "any",
+            "xor",
+            "entrypoint",
+            "iendswith",
+            "int38",
+            "of",
+            "uint16",
+            "defined",
+            "iequals",
+            "int8be",
+            "uint16be",
+            "at",
+            "filesize",
+            "in",
+            "istartswith",
+            "private",
+            "uint32",
+            "base64",
+            "for",
+            "include",
+            "startswith",
+            "uint8",
+            "global",
+            "int16be",
+            "nocase",
+            "uint8be",
         ]
         for word in keywords:
             self.highlightingRules.append((rf"\b{word}\b", keywordFormat))
@@ -540,29 +577,81 @@ class YaraHighlighter(QSyntaxHighlighter):
         idFormat.setForeground(QColor("#8e44ad"))  # purple
         self.highlightingRules.append((r"\$[A-Za-z0-9_]+", idFormat))
 
-        # --- Hex strings { 6A 40 ?? 68 } ---
-        hexFormat = QTextCharFormat()
-        hexFormat.setForeground(QColor("#d35400"))  # orange
-        self.highlightingRules.append((r"\{[^}]*\}", hexFormat))
+        # --- Hex blocks { 6A 40 ?? 68 } ---
+        hexBlockFormat = QTextCharFormat()
+        hexBlockFormat.setForeground(QColor("#27ae60"))  # green too
+        self.highlightingRules.append((r"\{[^}]*\}", hexBlockFormat))
+
+        # --- Numeric values (decimals + hex like 0x1A3F) ---
+        numberFormat = QTextCharFormat()
+        numberFormat.setForeground(QColor("#27ae60"))  # green
+        self.highlightingRules.append((r"\b0x[0-9A-Fa-f]+\b", numberFormat))
+        self.highlightingRules.append((r"\b\d+\b", numberFormat))
 
         # --- Strings "..." or '...' ---
         stringFormat = QTextCharFormat()
-        stringFormat.setForeground(QColor("#27ae60"))  # green
+        # stringFormat.setForeground(QColor("#27ae60"))  # green
+        stringFormat.setForeground(QColor("orange"))
         self.highlightingRules.append((r'"[^"\\]*(\\.[^"\\]*)*"', stringFormat))
         self.highlightingRules.append((r"'[^'\\]*(\\.[^'\\]*)*'", stringFormat))
 
-        # --- Comments (# ... and /* ... */) ---
-        commentFormat = QTextCharFormat()
-        commentFormat.setForeground(QColor("#7f8c8d"))  # gray
-        self.highlightingRules.append((r"#.*", commentFormat))
-        self.commentFormat = commentFormat  # store for multiline
+        # --- Single-line comments (// ...) ---
+        self.commentFormat = QTextCharFormat()
+        self.commentFormat.setFontItalic(True)
 
-        # Multiline comment start/end
+        self.highlightingRules.append((r"//[^\n]*", self.commentFormat))
+
+        # --- Multiline comment markers (/* ... */) ---
         self.commentStart = r"/\*"
         self.commentEnd = r"\*/"
 
+        # --- Watch for theme changes (PaletteChange) ---
+        if parent is not None:
+            parent.installEventFilter(self)
+
+    def _get_widget_with_palette(self):
+        """Safely get the first QWidget ancestor that has a palette."""
+        doc = self.document()
+        if not doc:
+            return None
+        obj = doc.parent()
+        while obj and not isinstance(obj, QWidget):
+            obj = obj.parent()
+        return obj
+
+    def eventFilter(self, obj, event):
+        """Listen for palette changes and trigger rehighlight."""
+        if event.type() == QEvent.PaletteChange:
+            self._updateCommentColor()
+            self.rehighlight()
+        return super().eventFilter(obj, event)
+
+    def _updateCommentColor(self):
+        """Set comment color based on current palette background brightness."""
+        widget = self._get_widget_with_palette()
+        if widget:
+            bg = widget.palette().color(QPalette.Base)
+        else:
+            bg = QColor("#ffffff")
+
+        # Compute perceived luminance (0 = dark, 255 = light)
+        luminance = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
+
+        print(f"Luminance is {luminance}")
+        if luminance < 128:
+            # Dark background → light gray comments
+            color = QColor("yellow")
+        else:
+            # Light background → darker gray comments
+            color = QColor("red")
+
+        self.commentFormat.setForeground(color)
+
     def highlightBlock(self, text: str):
         import re
+
+        # Dynamically update comment color before applying rules
+        self._updateCommentColor()
 
         # Apply all single-line patterns
         for pattern, fmt in self.highlightingRules:
