@@ -64,7 +64,7 @@ These are all found in the right click menu in the project view.
 
 **File Level**
 
-- Compile Rules
+- Brew (Compile)
   
   - Compiles all of the rule found in the `Yara-X Directory`
     
