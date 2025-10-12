@@ -60,7 +60,7 @@ These are all found in the right click menu in the project view.
 
 - Scanning Sage (Scan Only)
   
-  - Runs all of the compiled rules against all of the projects in the folder. The results are avaliable in the description and can be viewed at the file level using the BinYars sidebar widget.
+  - Runs all of the compiled rules against all of the files in the project. The results are avaliable in the description and can be viewed at the file level using the BinYars sidebar widget.
 
 **File Level**
 
