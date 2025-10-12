@@ -42,7 +42,7 @@ Set directory the plugin will use to find the .yar files in.
 
 These are all found in the right click menu in the project view.
 
-- Compile Rules
+- Brew (Compile)
   
   - Compiles all of the rules found in the `Yara-X Directory`
 
@@ -64,7 +64,7 @@ These are all found in the right click menu in the project view.
 
 **File Level**
 
-- Brew (Compile)
+- Compile Rules
   
   - Compiles all of the rule found in the `Yara-X Directory`
     
