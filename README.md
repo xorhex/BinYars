@@ -40,6 +40,8 @@ Set directory the plugin will use to find the .yar files in.
 
 **Project Level**
 
+*Note: This component requires Binary Ninja Commerical version or higher, as projects are not supported in other versions.*
+
 These are all found in the right click menu in the project view.
 
 - Brew (Compile)
@@ -63,6 +65,8 @@ These are all found in the right click menu in the project view.
   - Runs all of the compiled rules against all of the files in the project. The results are avaliable in the description and can be viewed at the file level using the BinYars sidebar widget.
 
 **File Level**
+
+*Note: Works with Binary Ninja Personal and higher.*
 
 - Compile Rules
   
