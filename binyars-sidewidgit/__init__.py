@@ -14,7 +14,7 @@ def get_os_libbinyars():
     elif os_name == "Linux":
         return "libbinyars.so"
     elif os_name == "Darwin":
-        return "libbinhars.dylib"
+        return "libbinyars.dylib"
     else:
         return "Unknown"
 
