@@ -26,6 +26,7 @@ This is all of the code for the Sidebar Widget as it's easier to write Qt Widget
 
 Steps:
 
+- Install the Python library dependencies from `binyars-sidewidgit/requirements.txt` to your Binary Ninja Python environment.
 - Copy the folder (or better yet symlink) `binyars-sidewidgit` to the Binary Ninja plugin dir.
 
 **Post Installation**
