@@ -244,7 +244,6 @@ class BinYarScanner:
                 for mr in raw_list
             ]
         except json.JSONDecodeError:
-            # Return raw string if JSON failed
             return None
 
     def scan_rule_against_bytes(self, raw_bytes: bytes, rule: str) -> str:

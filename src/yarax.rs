@@ -374,7 +374,7 @@ impl Scanner {
                     "Scanner found: {:?}",
                     results
                         .iter()
-                        .map(|r| r.folder.clone())
+                        .map(|r| r.rule.clone())
                         .collect::<Vec<String>>(),
                 );
 
@@ -442,7 +442,7 @@ impl Scanner {
                     "Scanner found: {:?} for {}",
                     result
                         .iter()
-                        .map(|r| r.folder.clone())
+                        .map(|r| r.rule.clone())
                         .collect::<Vec<String>>(),
                     file_id
                 );

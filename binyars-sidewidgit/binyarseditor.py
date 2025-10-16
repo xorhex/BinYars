@@ -637,7 +637,7 @@ class YaraHighlighter(QSyntaxHighlighter):
         # Compute perceived luminance (0 = dark, 255 = light)
         luminance = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
 
-        print(f"Luminance is {luminance}")
+        # print(f"Luminance is {luminance}")
         if luminance < 128:
             # Dark background → light gray comments
             color = QColor("yellow")

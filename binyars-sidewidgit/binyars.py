@@ -7,7 +7,7 @@ from binaryninjaui import (
     ViewFrame,
 )
 
-from PySide6.QtCore import Qt, QRectF, QSize, Property, Signal
+from PySide6.QtCore import Qt, QRectF, QSize, Property, Signal, Slot, QObject
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLayout,
@@ -25,14 +25,10 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QLineEdit,
+    QStyle,
+    QSpacerItem,
 )
-from PySide6.QtGui import (
-    QImage,
-    QPainter,
-    QColor,
-    QFontMetrics,
-    QPen,
-)
+from PySide6.QtGui import QImage, QPainter, QColor, QFontMetrics, QPen
 
 from binaryninja.log import Logger
 from binaryninja import BinaryView, Settings
@@ -56,6 +52,17 @@ logger = Logger(session_id=0, logger_name=__name__)
 KEY = "BinYars"
 PLUGIN_RULES_SERIALIZED_FILE = "yarax.compiled.bin"
 PLUGIN_SETTINGS_DIR = "BinYars Settings.Yara-X Directory.dir"
+DEFAULT_RULE_TEMPLATE = """rule <rule_name> {
+    meta:
+      BNFolder = ""
+      BNDescription = ""
+
+    strings:
+      
+    condition:
+      
+}
+"""
 
 
 def get_os_alt():
@@ -311,17 +318,38 @@ class BinYarsSidebarWidget(SidebarWidget):
         self.actionHandler.setupActionHandler(self)
 
         self.bv = None
-
         self.layout = QVBoxLayout()
+
+        ## Controls to display to the user the current
+        # Value fo Yara-X Rule Dir stored in the settings
+        self.binyarscandir_v1 = YaraRulesDirWidget(
+            Settings().get_string(PLUGIN_SETTINGS_DIR)
+        )
+        self.binyarscandir_v1.refresh_button.clicked.connect(
+            lambda: self.binyarscandir_v1.update_label(
+                Settings().get_string(PLUGIN_SETTINGS_DIR)
+            )
+        )
+
+        # Sadly can't use the same control twice so have to create a second one
+        self.binyarscandir_v2 = YaraRulesDirWidget(
+            Settings().get_string(PLUGIN_SETTINGS_DIR)
+        )
+        self.binyarscandir_v2.refresh_button.clicked.connect(
+            lambda: self.binyarscandir_v2.update_label(
+                Settings().get_string(PLUGIN_SETTINGS_DIR)
+            )
+        )
+        ## End Section
 
         self.tabs = QTabWidget()
         self.hit_details = QScanResultSelectedSection()
         self.hit_section = QScanResultsHitSection(self.hit_details)
-        tab1 = QTab([self.hit_section])
+        tab1 = QTab([self.hit_section, self.binyarscandir_v1])
         _ = self.tabs.addTab(tab1, "Scan Results")
 
         self.editor = QScanRuleEditSection()
-        tab2 = QTab([self.editor])
+        tab2 = QTab([self.editor, self.binyarscandir_v2])
         _ = self.tabs.addTab(tab2, "Rule Editor")
 
         self.layout.addWidget(self.tabs)
@@ -358,6 +386,45 @@ class QTab(QWidget):
                 self.layout.addWidget(QHLine())
         self.layout.addStretch()
         self.setLayout(self.layout)
+
+
+class YaraRulesDirWidget(QWidget):
+    def __init__(self, current_yara_rules_dir: str | None, parent=None):
+        super().__init__(parent)
+
+        # Horizontal layout
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+
+        # QLabel Field Name
+        self.yara_rules_label = QLabel("YARA-X Rules Directory: ")
+        layout.addWidget(self.yara_rules_label)
+
+        # QLabel For Value
+        self.yara_rules_dir = QLabel()
+        if current_yara_rules_dir:
+            self.update_label(current_yara_rules_dir)
+        else:
+            self.update_label("NOT SET, MUST BE SET IN THE CONFIG UNDER BINYARS")
+        layout.addWidget(self.yara_rules_dir)
+
+        # Horizontal spacer to push the button to the right
+        spacer = QSpacerItem(
+            40,
+            20,
+            QSizePolicy.Policy.Expanding,  # width expands
+            QSizePolicy.Policy.Minimum,  # height stays minimal
+        )
+        layout.addItem(spacer)
+
+        # Refresh QPushButton
+        self.refresh_button = QPushButton("Refresh")
+        layout.addWidget(self.refresh_button)
+
+    def update_label(self, text: str):
+        """Helper method to update the QLabel text."""
+        self.yara_rules_dir.setText(text)
 
 
 class QTitle(QLabel):
@@ -460,8 +527,6 @@ class AutoResizingTextEdit(QTextEdit):
             + widget_margins.bottom()
         )
 
-        # return QSize(original_hint.width(), minimum_height_hint)
-
 
 class ScanResults:
     def __init__(self, bv: BinaryView):
@@ -471,15 +536,7 @@ class ScanResults:
     def get_scan_results(self) -> list[str]:
         logger.log_debug(f"Getting scan results for {self.file_id}")
         results = []
-        if self.bv.project is not None:
-            logger.log_debug(f"Getting project scan results for {self.file_id}")
-            try:
-                metadata = json.loads(self.bv.project.query_metadata(KEY))
-                key = list(filter(lambda x: x == self.file_id, metadata))
-                if len(key) > 0:
-                    results.extend(metadata[key[0]])
-            except KeyError:
-                pass
+        ## By adding the rules from the file metadata first, we give presidence to these rules
         if self.bv.file.database is not None:
             if KEY in self.bv.metadata.keys():
                 logger.log_debug(f"Getting file scan results for {self.file_id}")
@@ -488,10 +545,25 @@ class ScanResults:
                     if item["rule"] not in [r["rule"] for r in results]:
                         results.append(item)
                     else:
-                        logger.log_info(
-                            f"Rule `{item['rule']}` also found at the project level, so skipping adding it again at the file level."
+                        logger.log_debug(
+                            f"Loading File Level Hits: Rule `{item['rule']}` already added, skipping.."
                         )
-                # results.extend(json.loads(self.bv.query_metadata(KEY)))
+        if self.bv.project is not None:
+            logger.log_debug(f"Getting project scan results for {self.file_id}")
+            try:
+                metadata = json.loads(self.bv.project.query_metadata(KEY))
+                key = list(filter(lambda x: x == self.file_id, metadata))
+                if len(key) > 0:
+                    pjson: list = json.loads(self.bv.query_metadata(KEY))
+                    for item in pjson:
+                        if item["rule"] not in [r["rule"] for r in results]:
+                            results.append(item)
+                        else:
+                            logger.log_debug(
+                                f"Loading Project Level Hits: Rule `{item['rule']}` also found at the file level, skipping.."
+                            )
+            except KeyError:
+                pass
         logger.log_debug(f"Rules found {results}")
         return results
 
@@ -568,6 +640,14 @@ class EditorActions(QWidget):
         self.save_as_btn = QPushButton("Save As")
         self.scan_btn = QPushButton("Scan")
         self.format_btn = QPushButton("Format")
+
+        horizontalSpacer = QSpacerItem(
+            40,
+            20,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum,
+        )
+        layout.addItem(horizontalSpacer)
 
         # Add to layout
         layout.addWidget(self.new_btn)
@@ -679,6 +759,7 @@ class QScanRuleEditSection(QWidget):
 
     def new_rule_file(self):
         self.editor.clear()
+        self.editor.setText(DEFAULT_RULE_TEMPLATE)
         self.file_picker.clear()
         self.actions._last_saved_path = None  # reset last saved file
         self.status.setLabelAndStatus("", Status.YELLOW)
@@ -904,6 +985,50 @@ class QScanResultSelectedSection(QWidget):
         self.master_list_widget.setItemWidget(sep_item, sep_line)
 
 
+class ComboActionButton(QWidget):
+    # Custom signal emitted when the run button is clicked
+    # It passes the currently selected combo text
+    runRequested = Signal(str)
+
+    def __init__(self, actions=None, parent=None):
+        super().__init__(parent)
+
+        # --- UI setup ---
+        self.combo = QComboBox(self)
+        self.combo.setMinimumHeight(28)
+
+        self.run_button = QPushButton(self)
+        play_icon = self.style().standardIcon(QStyle.SP_MediaPlay)
+        self.run_button.setIcon(play_icon)
+        self.run_button.setToolTip("Run selected action")
+        self.run_button.setFixedWidth(40)
+        self.run_button.setMinimumHeight(28)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.combo)
+        layout.addWidget(self.run_button)
+        self.setLayout(layout)
+
+        # --- Connections ---
+        self.run_button.clicked.connect(self._emit_run_signal)
+
+        # --- Populate actions if provided ---
+        if actions:
+            self.add_actions(actions)
+
+    def add_actions(self, actions):
+        """Add a list of action names to the combo box."""
+        self.combo.addItems(actions)
+
+    @Slot()
+    def _emit_run_signal(self):
+        """Emit signal when the play button is clicked."""
+        current_text = self.combo.currentText()
+        self.runRequested.emit(current_text)
+
+
 class QScanResultsHitSection(QWidget):
     def __init__(self, details: QScanResultSelectedSection):
         super(QScanResultsHitSection, self).__init__()
@@ -925,10 +1050,23 @@ class QScanResultsHitSection(QWidget):
         self.selection_layout.addWidget(self.hit_dropdown, 1)
         self.button_reload = QPushButton("Reload", self)
         self.button_reload.clicked.connect(self.reload_action)
+        self.button_reload.hide()
         self.selection_layout.addWidget(self.button_reload)
-        self.button_rescan = QPushButton("Rescan", self)
-        self.button_rescan.clicked.connect(self.rescan_action)
-        self.selection_layout.addWidget(self.button_rescan)
+
+        #### Combo Action Button
+        # Scan Only and Compile + Scan
+        self.combo_action = ComboActionButton(actions=["Compile + Scan", "Scan Only"])
+        self.selection_layout.addWidget(self.combo_action)
+
+        # Connect to the custom signal
+        def handle_run(action_name):
+            if action_name == "Scan Only":
+                self.rescan_action()
+            elif action_name == "Compile + Scan":
+                self.compile_rescan_action()
+
+        self.combo_action.runRequested.connect(handle_run)
+        #### End Combo Action Button
 
         self.selection_widget = QWidget(self)
         self.selection_widget.setLayout(self.selection_layout)
@@ -942,14 +1080,37 @@ class QScanResultsHitSection(QWidget):
 
     def get_data(self, bv: BinaryView, force: bool = False):
         self.bv = bv
+        if self.bv:
+            if self.bv.project:
+                if not self.button_reload.isVisible():
+                    self.button_reload.setVisible(True)
         self.data = ScanResults(bv).get_scan_results()
         items = [x["rule"] for x in self.data]
         current_items = self.hit_dropdown.allItems()
+
+        # Remember the currently selected rule before refreshing
+        previous_rule = self.hit_dropdown.currentText()
+
+        # Check if refresh is needed
         if set(items) != set(current_items) or force:
             logger.log_debug(f"Updating dropdown rule list: {items}")
             self.hit_dropdown.clear()
             self.details.clear()
             self.hit_dropdown.addItems(items)
+
+            # Try to reselect the previous rule if it still exists
+            if previous_rule in items:
+                index = self.hit_dropdown.findText(previous_rule)
+                if index != -1:
+                    self.hit_dropdown.setCurrentIndex(index)
+                    logger.log_debug(f"Reselected previous rule: {previous_rule}")
+            else:
+                # Default to the first item if previous no longer exists
+                if items:
+                    self.hit_dropdown.setCurrentIndex(0)
+                    logger.log_debug(
+                        "Previous rule not found; defaulted to first item."
+                    )
 
     def select_item_in_hit_dropdown(self, hdropdown: QComboBox, rule_name: str):
         idx: int = hdropdown.findText(rule_name)
@@ -1007,7 +1168,13 @@ class QScanResultsHitSection(QWidget):
             self.get_data(self.bv, True)
 
     def rescan_action(self):
-        logger.log_debug("ReScan clicked")
+        logger.log_debug("Scan Only clicked")
+        if self.bv:
+            if not self.bv.has_database:
+                logger.log_error(
+                    "Must save the the binary first to create the\nbndb file in order to scan the file."
+                )
+                return
 
         def worker():
             scanner = BinYarScanner()
@@ -1017,18 +1184,62 @@ class QScanResultsHitSection(QWidget):
             else:
                 logger.log_debug("No hits to save")
 
-        thread = WorkerHeartbeatThread(worker)
+        def on_complete():
+            logger.log_debug("Refreshing results after scanning")
+
+        thread = WorkerHeartbeatThread(worker, on_complete)
+        thread.signals.finished.connect(self.on_scan_finished)
         thread.start()
+
+    def compile_rescan_action(self):
+        logger.log_debug("Compile + Scan clicked")
+        if self.bv:
+            if not self.bv.has_database:
+                logger.log_error(
+                    "Must save the the binary first to create the\nbndb file in order to scan the file."
+                )
+                return
+
+        def worker():
+            scanner = BinYarScanner()
+            scanner.precompile()
+            if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
+                logger.log_debug(f"Saving hits: {hits}")
+                scanner.save(self.bv, hits)
+            else:
+                logger.log_debug("No hits to save")
+
+        def on_complete():
+            logger.log_debug("Refreshing results after recompiling and scanning")
+
+        thread = WorkerHeartbeatThread(worker, on_complete)
+        thread.signals.finished.connect(self.on_scan_finished)
+        thread.start()
+
+    @Slot()
+    def on_scan_finished(self):
+        if self.bv is not None:
+            self.get_data(self.bv, True)
+
+
+class WorkerSignalBridge(QObject):
+    finished = Signal()
 
 
 class WorkerHeartbeatThread(threading.Thread):
-    def __init__(self, func):
-        threading.Thread.__init__(self)
+    def __init__(self, func, on_complete=None):
+        super().__init__(daemon=True)
         self.func = func
-        self.daemon = True
+        self.on_complete = on_complete
+        self.signals = WorkerSignalBridge()
 
     def run(self):
-        self.func()
+        try:
+            self.func()
+        finally:
+            if self.on_complete:
+                self.on_complete()
+            self.signals.finished.emit()
 
 
 def clearLayoutHelper(layout: QLayout):

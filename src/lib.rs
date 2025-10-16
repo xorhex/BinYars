@@ -2,7 +2,7 @@
 extern crate custom_error;
 
 use binaryninja::background_task::BackgroundTask;
-use binaryninja::binary_view::BinaryView;
+use binaryninja::binary_view::{BinaryView, BinaryViewExt};
 use binaryninja::command::{
     register_command, register_command_for_project, Command, ProjectCommand,
 };
@@ -168,8 +168,8 @@ impl Command for RuleCompileCommand {
         });
     }
 
-    fn valid(&self, _view: &BinaryView) -> bool {
-        true
+    fn valid(&self, view: &BinaryView) -> bool {
+        view.file().project_file().is_none()
     }
 }
 
