@@ -1159,6 +1159,9 @@ class QScanResultsHitSection(QWidget):
         self.hit_dropdown.currentIndexChanged.connect(self.hit_index_changed)
         self.selection_layout.addWidget(self.hit_dropdown, 1)
         self.button_reload = QPushButton("Reload", self)
+        self.button_reload.setToolTip(
+            "Reloads the scan results; not the\nresults from the last 'Rule Editor' scan.\nThis will reset the results shown\nback to the file 'Scan Results' scan."
+        )
         self.button_reload.clicked.connect(self.reload_action)
         self.selection_layout.addWidget(self.button_reload)
 
