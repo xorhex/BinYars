@@ -249,9 +249,7 @@ class CodeEditor(QPlainTextEdit):
 
             fmt = QTextCharFormat()
             if match_pos is not None:
-                # fmt.setBackground(QColor("#ffff00"))  # yellow highlight
-                # fmt.setForeground(QColor("black"))
-                fmt.setForeground(QColor("yellow"))
+                fmt.setForeground(QColor("purple"))
                 for p in (pos, match_pos):
                     cur = QTextCursor(self.document())
                     cur.setPosition(p)
@@ -450,12 +448,8 @@ class CodeEditor(QPlainTextEdit):
         painter = QPainter(self._lineNumberArea)
 
         # Use the widget's background color instead of hard-coded
-        # bg_color = self._lineNumberArea.palette().color(
-        #    self._lineNumberArea.backgroundRole()
-        # )
         gutter_bg = self._lineNumberArea.palette().color(QPalette.Base)
         painter.fillRect(event.rect(), gutter_bg)
-        # painter.fillRect(event.rect(), QColor(240, 240, 240))
 
         block = self.firstVisibleBlock()
         blockNumber = block.blockNumber()
@@ -479,7 +473,6 @@ class CodeEditor(QPlainTextEdit):
             if block.isVisible() and bottom >= event.rect().top():
                 number = str(blockNumber + 1)
 
-                # highlight current line number
                 # highlight current line number
                 if blockNumber == self._currentLine:
                     painter.fillRect(0, top, numberWidth, lineHeight, highlight_color)

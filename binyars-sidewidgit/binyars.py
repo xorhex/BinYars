@@ -45,11 +45,13 @@ from collections import defaultdict
 
 from .binyarscanner import BinYarScanner, Identifier, ConsoleEntry, ConsoleEntryGroup
 from .binyarseditor import CodeEditorWidget
+from .state import StateInfo
 
 
 logger = Logger(session_id=0, logger_name=__name__)
 
 KEY = "BinYars"
+TEMPKEY = "BinYarsTempResults"
 PLUGIN_RULES_SERIALIZED_FILE = "yarax.compiled.bin"
 PLUGIN_SETTINGS_DIR = "BinYars Settings.Yara-X Directory.dir"
 DEFAULT_RULE_TEMPLATE = """rule <rule_name> {
@@ -63,6 +65,7 @@ DEFAULT_RULE_TEMPLATE = """rule <rule_name> {
       
 }
 """
+state = StateInfo()
 
 
 def get_os_alt():
@@ -320,7 +323,7 @@ class BinYarsSidebarWidget(SidebarWidget):
         self.bv = None
         self.layout = QVBoxLayout()
 
-        ## Controls to display to the user the current
+        ## Controls to display to the use the current
         # Value fo Yara-X Rule Dir stored in the settings
         self.binyarscandir_v1 = YaraRulesDirWidget(
             Settings().get_string(PLUGIN_SETTINGS_DIR)
@@ -349,6 +352,18 @@ class BinYarsSidebarWidget(SidebarWidget):
         _ = self.tabs.addTab(tab1, "Scan Results")
 
         self.editor = QScanRuleEditSection()
+
+        def view_temp_rule_results(bv):
+            if self.hit_section.get_data(bv, temp_data_only=True):
+                logger.log_debug("Switching to Scan Results Tab")
+                self.tabs.setCurrentIndex(
+                    self.get_tab_index_by_name(self.tabs, "Scan Results")
+                )
+
+        self.editor.viewScanResultsRequested.connect(
+            lambda bv: view_temp_rule_results(bv)
+        )
+
         tab2 = QTab([self.editor, self.binyarscandir_v2])
         _ = self.tabs.addTab(tab2, "Rule Editor")
 
@@ -356,16 +371,35 @@ class BinYarsSidebarWidget(SidebarWidget):
         self.setLayout(self.layout)
 
     def notifyViewChanged(self, view_frame):
+        global state
         logger.log_debug("View changed")
         if view_frame is not None:
             view = view_frame.getCurrentViewInterface()
             self.bv = view.getData()
             logger.log_debug(f"View changed to: {self.bv.file.view}")
-            self.hit_section.get_data(self.bv)
-            self.hit_details.update_bv(self.bv)
-            self.editor.update_bv(self.bv)
+            current_file_id = get_file_id(self.bv)
+            if state.last_loaded_file_id != current_file_id:
+                # Get the last used metadata key for the current_file_id
+                # this is needed to restore the correct yara-x result set
+                # when switching between samples
+                self.hit_section.get_data(
+                    self.bv, temp_data_only=state.get_last_update(current_file_id)
+                )
+                self.hit_details.update_bv(self.bv)
+                self.editor.update_bv(self.bv)
+                state.last_loaded_bv_file = current_file_id
         else:
             self.bv = None
+
+    def get_tab_index_by_name(self, tab_widget: QTabWidget, name: str) -> int:
+        """
+        Return the index of a tab by its name (label).
+        Returns -1 if not found.
+        """
+        for i in range(tab_widget.count()):
+            if tab_widget.tabText(i) == name:
+                return i
+        return -1
 
 
 class QTab(QWidget):
@@ -533,35 +567,41 @@ class ScanResults:
         self.bv = bv
         self.file_id = get_file_id(self.bv)
 
-    def get_scan_results(self) -> list[str]:
-        logger.log_debug(f"Getting scan results for {self.file_id}")
+    def get_scan_results(self, key: str = KEY) -> list[str]:
+        logger.log_debug(f"Getting scan results for {self.file_id} under key {key}")
         results = []
+
         ## By adding the rules from the file metadata first, we give presidence to these rules
         if self.bv.file.database is not None:
-            if KEY in self.bv.metadata.keys():
-                logger.log_debug(f"Getting file scan results for {self.file_id}")
-                pjson: list = json.loads(self.bv.query_metadata(KEY))
-                for item in pjson:
-                    if item["rule"] not in [r["rule"] for r in results]:
-                        results.append(item)
-                    else:
-                        logger.log_debug(
-                            f"Loading File Level Hits: Rule `{item['rule']}` already added, skipping.."
-                        )
-        if self.bv.project is not None:
-            logger.log_debug(f"Getting project scan results for {self.file_id}")
-            try:
-                metadata = json.loads(self.bv.project.query_metadata(KEY))
-                key = list(filter(lambda x: x == self.file_id, metadata))
-                if len(key) > 0:
-                    pjson: list = json.loads(self.bv.query_metadata(KEY))
+            if key in self.bv.metadata.keys():
+                if isinstance(key, str):
+                    pjson: list = json.loads(self.bv.query_metadata(key))
                     for item in pjson:
                         if item["rule"] not in [r["rule"] for r in results]:
                             results.append(item)
                         else:
                             logger.log_debug(
-                                f"Loading Project Level Hits: Rule `{item['rule']}` also found at the file level, skipping.."
+                                f"Loading File Level Hits: Rule `{item['rule']}` already added, skipping.."
                             )
+                else:
+                    logger.log_debug("Key is not of type string")
+        if self.bv.project is not None:
+            logger.log_debug(f"Getting project scan results for {self.file_id}")
+            try:
+                metadata = json.loads(self.bv.project.query_metadata(key))
+                keys = list(filter(lambda x: x == self.file_id, metadata))
+                if len(keys) > 0:
+                    if isinstance(key, str):
+                        pjson: list = json.loads(self.bv.query_metadata(key))
+                        for item in pjson:
+                            if item["rule"] not in [r["rule"] for r in results]:
+                                results.append(item)
+                            else:
+                                logger.log_debug(
+                                    f"Loading Project Level Hits: Rule `{item['rule']}` also found at the file level, skipping.."
+                                )
+                    else:
+                        logger.log_debug("Key is not of type string")
             except KeyError:
                 pass
         logger.log_debug(f"Rules found {results}")
@@ -623,6 +663,7 @@ class EditorActions(QWidget):
     fileSaveRequested = Signal(str)  # Save (may reuse last file)
     fileSaveAsRequested = Signal(str)  # Save As (always dialog)
     scanRequested = Signal()
+    scanViewResultsRequested = Signal()
     formatRequested = Signal()
 
     def __init__(self, parent=None):
@@ -638,7 +679,26 @@ class EditorActions(QWidget):
         self.new_btn = QPushButton("New")
         self.save_btn = QPushButton("Save")
         self.save_as_btn = QPushButton("Save As")
-        self.scan_btn = QPushButton("Scan")
+
+        ### Combo action button
+        #
+        self.scan_combo_action = ComboActionButton(
+            actions=["Scan + View Details", "Scan Only"]
+        )
+
+        # Connect to the custom signal
+        def handle_run(action_name):
+            if action_name == "Scan Only":
+                logger.log_debug("Scan Only Clicked")
+                self.scanRequested.emit()
+            elif action_name == "Scan + View Details":
+                logger.log_debug("Scan + View Details Clicked")
+                self.scanViewResultsRequested.emit()
+
+        self.scan_combo_action.runRequested.connect(handle_run)
+        #
+        ### End Combo action button
+
         self.format_btn = QPushButton("Format")
 
         horizontalSpacer = QSpacerItem(
@@ -653,7 +713,7 @@ class EditorActions(QWidget):
         layout.addWidget(self.new_btn)
         layout.addWidget(self.save_btn)
         layout.addWidget(self.save_as_btn)
-        layout.addWidget(self.scan_btn)
+        layout.addWidget(self.scan_combo_action)
         layout.addWidget(self.format_btn)
 
         self.setLayout(layout)
@@ -662,7 +722,7 @@ class EditorActions(QWidget):
         self.new_btn.clicked.connect(self.newFileRequested.emit)
         self.save_btn.clicked.connect(self.save_file)
         self.save_as_btn.clicked.connect(self.save_file_as)
-        self.scan_btn.clicked.connect(self.scanRequested.emit)
+        # self.scan_combo_action.clicked.connect(handle_run)
         self.format_btn.clicked.connect(self.formatRequested.emit)
 
     def save_file(self, path: str | None = None):
@@ -696,6 +756,8 @@ class EditorActions(QWidget):
 
 
 class QScanRuleEditSection(QWidget):
+    viewScanResultsRequested = Signal(BinaryView)
+
     def __init__(self):
         super(QScanRuleEditSection, self).__init__()
         self.layout = QVBoxLayout()
@@ -721,6 +783,7 @@ class QScanRuleEditSection(QWidget):
         self.actions.fileSaveRequested.connect(self.save_to_file)
         self.actions.fileSaveAsRequested.connect(self._save_as_and_update_picker)
         self.actions.scanRequested.connect(self.run_scan)
+        self.actions.scanViewResultsRequested.connect(self.run_scan_view_results)
         self.actions.formatRequested.connect(self.format_text)
         self.file_picker.fileSelected.connect(self.load_file)
         self.editor.statusLightClicked.connect(self.show_error)
@@ -765,6 +828,7 @@ class QScanRuleEditSection(QWidget):
         self.status.setLabelAndStatus("", Status.YELLOW)
 
     def run_scan(self):
+        logger.log_debug("Running scan")
         scanner = BinYarScanner()
         self.editor.clearAllLineStatuses()
         if error_msg := scanner.rule_compiles(self.editor.text()):
@@ -795,6 +859,52 @@ class QScanRuleEditSection(QWidget):
 
                 thread = WorkerHeartbeatThread(worker)
                 thread.start()
+
+    def run_scan_view_results(self):
+        logger.log_debug("Running scan and viewing results")
+        scanner = BinYarScanner()
+        self.editor.clearAllLineStatuses()
+        if error_msg := scanner.rule_compiles(self.editor.text()):
+            # Add statuses with messages
+            line_no, error_no, msg, col_num = parse_yarax_error(error_msg)
+            self.status.setLabelAndStatus(f"Compile error: {error_no}", Status.RED)
+            self.editor.setLineStatus(line_no, "red", msg, col_num)
+        else:
+            if self.bv:
+
+                def worker():
+                    results_json = scanner.scan_rule_against_bytes(
+                        self.bv.file.raw.read(0, self.bv.file.raw.length),
+                        self.editor.text(),
+                    )
+                    count = len(results_json)
+                    if count == 0:
+                        self.status.setLabelAndStatus("No Rules Matched", Status.RED)
+                    else:
+                        word = "Rule" if count == 1 else "Rules"
+                        self.status.setLabelAndStatus(
+                            f"{count} {word} Matched", Status.GREEN
+                        )
+
+                    scanner.save(self.bv, results_json, TEMPKEY)
+
+                    logger.log_debug(
+                        f"Test scan against current file returned: {results_json}"
+                    )
+
+                def on_complete():
+                    logger.log_debug(
+                        "Refreshing results after recompiling and scanning"
+                    )
+
+                thread = WorkerHeartbeatThread(worker, on_complete)
+                thread.signals.finished.connect(self.on_scan_finished_view_results)
+                thread.start()
+
+    @Slot()
+    def on_scan_finished_view_results(self):
+        # Can't refresh the data from here, need to proprogate the signal upwards
+        self.viewScanResultsRequested.emit(self.bv)
 
     def format_text(self):
         """Placeholder for format action."""
@@ -1050,7 +1160,6 @@ class QScanResultsHitSection(QWidget):
         self.selection_layout.addWidget(self.hit_dropdown, 1)
         self.button_reload = QPushButton("Reload", self)
         self.button_reload.clicked.connect(self.reload_action)
-        self.button_reload.hide()
         self.selection_layout.addWidget(self.button_reload)
 
         #### Combo Action Button
@@ -1078,13 +1187,16 @@ class QScanResultsHitSection(QWidget):
         self.data = None
         self.bv = None
 
-    def get_data(self, bv: BinaryView, force: bool = False):
+    def get_data(
+        self,
+        bv: BinaryView,
+        force: bool = False,
+        temp_data_only: bool = False,
+    ) -> bool:
         self.bv = bv
-        if self.bv:
-            if self.bv.project:
-                if not self.button_reload.isVisible():
-                    self.button_reload.setVisible(True)
-        self.data = ScanResults(bv).get_scan_results()
+        self.data = ScanResults(self.bv).get_scan_results(
+            TEMPKEY if temp_data_only else KEY
+        )
         items = [x["rule"] for x in self.data]
         current_items = self.hit_dropdown.allItems()
 
@@ -1111,6 +1223,10 @@ class QScanResultsHitSection(QWidget):
                     logger.log_debug(
                         "Previous rule not found; defaulted to first item."
                     )
+        # Capture state information
+        state.update(get_file_id(self.bv), temp_data_only)
+
+        return True if self.data else False
 
     def select_item_in_hit_dropdown(self, hdropdown: QComboBox, rule_name: str):
         idx: int = hdropdown.findText(rule_name)
@@ -1180,7 +1296,7 @@ class QScanResultsHitSection(QWidget):
             scanner = BinYarScanner()
             if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
                 logger.log_debug(f"Saving hits: {hits}")
-                scanner.save(self.bv, hits)
+                scanner.save(self.bv, hits, KEY)
             else:
                 logger.log_debug("No hits to save")
 
@@ -1205,7 +1321,7 @@ class QScanResultsHitSection(QWidget):
             scanner.precompile()
             if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
                 logger.log_debug(f"Saving hits: {hits}")
-                scanner.save(self.bv, hits)
+                scanner.save(self.bv, hits, KEY)
             else:
                 logger.log_debug("No hits to save")
 

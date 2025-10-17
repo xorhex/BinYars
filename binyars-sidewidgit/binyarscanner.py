@@ -15,7 +15,6 @@ import yara_x as yr
 
 logger = Logger(session_id=0, logger_name=__name__)
 
-KEY = "BinYars"
 PLUGIN_RULES_SERIALIZED_FILE = "yarax.compiled.bin"
 PLUGIN_SETTINGS_DIR = "BinYars Settings.Yara-X Directory.dir"
 PLUGIN_SETTINGS_NAME = "BinYars Settings.BinYars Rust Lib.name"
@@ -292,8 +291,8 @@ class BinYarScanner:
             # Return raw string if JSON failed
             return None
 
-    def save(self, bv: BinaryView, hits: list[MetaRule]):
-        bv.store_metadata(KEY, json.dumps([asdict(mr) for mr in hits]))
+    def save(self, bv: BinaryView, hits: list[MetaRule], key: str):
+        bv.store_metadata(key, json.dumps([asdict(mr) for mr in hits]))
 
     def get_module_fields(self, raw_bytes):
         data_ptr = (c_uint8 * len(raw_bytes))(*raw_bytes)
