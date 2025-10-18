@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-yara-x = "1.4.0"
+yara-x = "1.7.1"
 binaryninja = { git = "https://github.com/Vector35/binaryninja-api.git", branch = "dev"}
 # Locates binaryninjacore on your system.
 binaryninjacore-sys = { git = "https://github.com/Vector35/binaryninja-api.git", branch = "dev"}

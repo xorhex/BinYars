@@ -46,7 +46,7 @@ from collections import defaultdict
 from .binyarscanner import BinYarScanner, Identifier, ConsoleEntry, ConsoleEntryGroup
 from .binyarseditor import CodeEditorWidget
 from .state import StateInfo
-
+from .binyarsdiraboutwidget import YaraRulesDirWidget
 
 logger = Logger(session_id=0, logger_name=__name__)
 
@@ -422,45 +422,6 @@ class QTab(QWidget):
         self.setLayout(self.layout)
 
 
-class YaraRulesDirWidget(QWidget):
-    def __init__(self, current_yara_rules_dir: str | None, parent=None):
-        super().__init__(parent)
-
-        # Horizontal layout
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
-
-        # QLabel Field Name
-        self.yara_rules_label = QLabel("YARA-X Rules Directory: ")
-        layout.addWidget(self.yara_rules_label)
-
-        # QLabel For Value
-        self.yara_rules_dir = QLabel()
-        if current_yara_rules_dir:
-            self.update_label(current_yara_rules_dir)
-        else:
-            self.update_label("NOT SET, MUST BE SET IN THE CONFIG UNDER BINYARS")
-        layout.addWidget(self.yara_rules_dir)
-
-        # Horizontal spacer to push the button to the right
-        spacer = QSpacerItem(
-            40,
-            20,
-            QSizePolicy.Policy.Expanding,  # width expands
-            QSizePolicy.Policy.Minimum,  # height stays minimal
-        )
-        layout.addItem(spacer)
-
-        # Refresh QPushButton
-        self.refresh_button = QPushButton("Refresh")
-        layout.addWidget(self.refresh_button)
-
-    def update_label(self, text: str):
-        """Helper method to update the QLabel text."""
-        self.yara_rules_dir.setText(text)
-
-
 class QTitle(QLabel):
     def __init__(self, title: str):
         super(QTitle, self).__init__(title)
@@ -722,7 +683,6 @@ class EditorActions(QWidget):
         self.new_btn.clicked.connect(self.newFileRequested.emit)
         self.save_btn.clicked.connect(self.save_file)
         self.save_as_btn.clicked.connect(self.save_file_as)
-        # self.scan_combo_action.clicked.connect(handle_run)
         self.format_btn.clicked.connect(self.formatRequested.emit)
 
     def save_file(self, path: str | None = None):
