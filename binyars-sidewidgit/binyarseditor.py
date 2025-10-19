@@ -11,6 +11,32 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget, QPlainTextEdit, QTextEdit, QVBoxLayout, QToolTip
 
 
+class PaletteAwareMixin:
+    """Mixin providing helpers to access palette colors and luminance."""
+
+    def _get_widget_with_palette(self):
+        """Safely get the first QWidget ancestor that has a palette."""
+        # For QSyntaxHighlighter, self.document() exists
+        doc = getattr(self, "document", lambda: None)()
+        obj = doc.parent() if doc else None
+
+        # Climb until we find a QWidget
+        while obj and not isinstance(obj, QWidget):
+            obj = getattr(obj, "parent", lambda: None)()
+        return obj
+
+    def _getLuminance(self) -> int:
+        """Compute the perceived luminance of the background color."""
+        widget = self._get_widget_with_palette()
+        if widget:
+            bg = widget.palette().color(QPalette.Base)
+        else:
+            bg = QColor("#ffffff")
+
+        # Perceived luminance formula (0 = dark, 255 = light)
+        return int(0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue())
+
+
 class LineNumberArea(QWidget):
     def __init__(self, editor):
         super().__init__(editor)
@@ -101,7 +127,7 @@ class LineStatus:
         self.col_num = col_num
 
 
-class CodeEditor(QPlainTextEdit):
+class CodeEditor(QPlainTextEdit, PaletteAwareMixin):
     statusLightClicked = Signal(int, str)  # (line, message)
     INDENT_WIDTH = 2  # spaces per tab
 
@@ -249,7 +275,10 @@ class CodeEditor(QPlainTextEdit):
 
             fmt = QTextCharFormat()
             if match_pos is not None:
-                fmt.setForeground(QColor("purple"))
+                if self._getLuminance() > 128:
+                    fmt.setForeground(QColor("red"))
+                else:
+                    fmt.setForeground(QColor("yellow"))
                 for p in (pos, match_pos):
                     cur = QTextCursor(self.document())
                     cur.setPosition(p)
@@ -504,7 +533,7 @@ class CodeEditor(QPlainTextEdit):
         self._applyExtraSelections()
 
 
-class YaraHighlighter(QSyntaxHighlighter):
+class YaraHighlighter(QSyntaxHighlighter, PaletteAwareMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.highlightingRules = []
@@ -602,16 +631,6 @@ class YaraHighlighter(QSyntaxHighlighter):
         if parent is not None:
             parent.installEventFilter(self)
 
-    def _get_widget_with_palette(self):
-        """Safely get the first QWidget ancestor that has a palette."""
-        doc = self.document()
-        if not doc:
-            return None
-        obj = doc.parent()
-        while obj and not isinstance(obj, QWidget):
-            obj = obj.parent()
-        return obj
-
     def eventFilter(self, obj, event):
         """Listen for palette changes and trigger rehighlight."""
         if event.type() == QEvent.PaletteChange:
@@ -621,17 +640,7 @@ class YaraHighlighter(QSyntaxHighlighter):
 
     def _updateCommentColor(self):
         """Set comment color based on current palette background brightness."""
-        widget = self._get_widget_with_palette()
-        if widget:
-            bg = widget.palette().color(QPalette.Base)
-        else:
-            bg = QColor("#ffffff")
-
-        # Compute perceived luminance (0 = dark, 255 = light)
-        luminance = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
-
-        # print(f"Luminance is {luminance}")
-        if luminance < 128:
+        if self._getLuminance() < 128:
             # Dark background → light gray comments
             color = QColor("yellow")
         else:
