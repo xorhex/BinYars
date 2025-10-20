@@ -362,7 +362,7 @@ impl Scanner {
                     .map(|h| {
                         MetaRule::new(
                             h.identifier().to_string(),
-                            get_metadata_string_field(h.metadata(), "BNDescription")
+                            get_metadata_string_field(h.metadata(), "Description")
                                 .unwrap_or_default(),
                             get_metadata_string_field(h.metadata(), "BNFolder").unwrap_or_default(),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
@@ -430,7 +430,7 @@ impl Scanner {
                     .map(|h| {
                         MetaRule::new(
                             h.identifier().to_string(),
-                            get_metadata_string_field(h.metadata(), "BNDescription")
+                            get_metadata_string_field(h.metadata(), "Description")
                                 .unwrap_or_default(),
                             get_metadata_string_field(h.metadata(), "BNFolder").unwrap_or_default(),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),

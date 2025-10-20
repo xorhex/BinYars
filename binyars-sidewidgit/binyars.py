@@ -547,14 +547,15 @@ class ScanResults:
                 else:
                     logger.log_debug("Key is not of type string")
         if self.bv.project is not None:
-            logger.log_debug(f"Getting project scan results for {self.file_id}")
+            logger.log_debug(
+                f"Getting project scan results for {self.file_id} under key {key}"
+            )
             try:
-                metadata = json.loads(self.bv.project.query_metadata(key))
-                keys = list(filter(lambda x: x == self.file_id, metadata))
-                if len(keys) > 0:
-                    if isinstance(key, str):
-                        pjson: list = json.loads(self.bv.query_metadata(key))
-                        for item in pjson:
+                if isinstance(key, str):
+                    metadata = json.loads(self.bv.project.query_metadata(key))
+                    keys = list(filter(lambda x: x == self.file_id, metadata))
+                    if len(keys) > 0:
+                        for item in metadata[keys[0]]:
                             if item["rule"] not in [r["rule"] for r in results]:
                                 results.append(item)
                             else:
@@ -562,7 +563,9 @@ class ScanResults:
                                     f"Loading Project Level Hits: Rule `{item['rule']}` also found at the file level, skipping.."
                                 )
                     else:
-                        logger.log_debug("Key is not of type string")
+                        logger.log_debug("Length of keys is 0")
+                else:
+                    logger.log_debug("Key is not of type string")
             except KeyError:
                 pass
         logger.log_debug(f"Rules found {results}")

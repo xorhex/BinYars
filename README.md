@@ -101,7 +101,7 @@ Add two fields to the meta section as needed.
 
 - **bnfolder**: This is the folder name to assign all of the matches to in Binary Ninja's Project View
 
-- **bndescription**: The rule description to render inside of Binary Ninja.  
+- **description**: The rule description to render inside of Binary Ninja.  
 
 **Console Module**
 
@@ -144,7 +144,7 @@ import "console"
 rule this_rule_has_been_taken {
     meta:
         bnfolder = "Secret Sauce"
-        bndescription = "This rule captures a very particular set of bytes, bytes I have acquired over a very long career. Bytes that make me a nightmare for binaries like you."
+        description = "This rule captures a very particular set of bytes, bytes I have acquired over a very long career. Bytes that make me a nightmare for binaries like you."
     strings:
         $very_particular_set_of_bytes = { ?? ?? ?? ?? ?? ?? ?? }
     condition:
