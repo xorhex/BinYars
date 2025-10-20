@@ -151,6 +151,22 @@ class BinYarScanner:
         ]
         self.lib.scan_rule_against_bytes.restype = ctypes.c_void_p  # returns a C string
 
+        self.lib.get_library_versions_json.restype = ctypes.c_void_p
+
+    def get_yara_version(self):
+        # Call the function
+        result_ptr = self.lib.get_library_versions_json()
+
+        # Free Rust string
+        result = ctypes.string_at(result_ptr).decode("utf-8")
+
+        # Free Rust string
+        self.lib.free_rust_string(result_ptr)
+
+        # Convert JSON back into Python dict
+        versions = json.loads(result)
+        return versions
+
     def precompile(self):
         if self.yar_dir is not None:
             compiler = yr.Compiler()

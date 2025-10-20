@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 
 fn main() {
@@ -17,4 +18,15 @@ fn main() {
             link_path.to_string_lossy()
         );
     }
+
+    // Read Cargo.lock to extract the version of a dependency
+    let lock = fs::read_to_string("Cargo.lock").unwrap();
+    let version = lock
+        .lines()
+        .skip_while(|line| !line.contains("name = \"yara-x\""))
+        .find(|line| line.contains("version ="))
+        .and_then(|line| line.split('"').nth(1))
+        .unwrap_or("unknown");
+
+    println!("cargo:rustc-env=YARA_X_VERSION={}", version);
 }

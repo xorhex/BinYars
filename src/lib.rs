@@ -117,6 +117,9 @@ fn plugin_init() {
         "YaraX ALL The Things!",
         SortCommand {},
     );
+
+    let yara_x_version = env!("YARA_X_VERSION");
+    log::debug!("Using yara-x version: {}", yara_x_version);
 }
 
 /*****************************************************

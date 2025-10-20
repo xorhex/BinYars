@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use binaryninja::background_task::BackgroundTask;
 use log::info;
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -766,4 +767,23 @@ pub unsafe extern "C" fn free_rust_string(ptr: *mut c_char) {
             let _ = CString::from_raw(ptr);
         }
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_library_versions_json() -> *const c_char {
+    // Get compile-time version for yara-x
+    let yara_x_version = env!("YARA_X_VERSION");
+
+    // Build the JSON object
+    let info = json!({
+        "yara-x": yara_x_version,
+    });
+
+    // Convert to string and return as *const c_char
+    let result = match serde_json::to_string(&info) {
+        Ok(json_str) => CString::new(json_str).unwrap(),
+        Err(_) => CString::new("{}").unwrap(),
+    };
+
+    result.into_raw()
 }

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from binaryninja.log import Logger
+from .binyarscanner import BinYarScanner
 from .logo import BINYARS_LOGO_BASE64
 
 logger = Logger(session_id=0, logger_name=__name__)
@@ -21,6 +22,8 @@ class YaraRulesDirWidget(QWidget):
     def __init__(self, current_yara_rules_dir: str | None, parent=None):
         super().__init__(parent)
 
+        scanner = BinYarScanner()
+        self.yara_info = scanner.get_yara_version()
         # Horizontal layout
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -87,7 +90,7 @@ class YaraRulesDirWidget(QWidget):
                 </tr>
             </table>
 
-            <p><b>BinYars</b> is built leveraging <b>Binary Ninja</b> and <b>YARA-X</b> 
+            <p><b>BinYars</b> is built leveraging <b>Binary Ninja</b> and <b>YARA-X</b>
             to enable powerful binary pattern analysis and rule-driven workflows.</p>
 
             <p><b>Developed By: </b><a href='https://blog.xorhex.com'>xorhex</a><p>
@@ -99,6 +102,8 @@ class YaraRulesDirWidget(QWidget):
 
             <p>Check for updates and learn more at:<br>
             <a href='https://github.com/xorhex/BinYars'>https://github.com/xorhex/BinYars</a></p>
+
+            <p>Compiled with <a href='https://virustotal.github.io/yara-x/'>YARA-X</a> version: {self.yara_info["yara-x"]}</p>
 
             <p style='margin-top:12px; font-size: small; color: #666;'>
             © 2025 xorhex. MIT License
