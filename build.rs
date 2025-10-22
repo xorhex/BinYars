@@ -5,19 +5,31 @@ fn main() {
     let link_path = std::env::var_os("DEP_BINARYNINJACORE_PATH")
         .expect("DEP_BINARYNINJACORE_PATH not specified");
 
-    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR specified");
-    let _out_dir_path = PathBuf::from(out_dir);
-
     println!("cargo::rustc-link-lib=dylib=binaryninjacore");
     println!("cargo::rustc-link-search={}", link_path.to_str().unwrap());
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "windows")]
+    {
+        let third_party_link_path = std::env::var_os("THIRD_PARTY_LIBS")
+            .expect("THIRD_PARTY_LIBS not specified");
+
+        println!(
+            "cargo::rustc-link-search={}",
+             third_party_link_path.to_str().unwrap()
+         );
+    }
+
+    #[cfg(target_os = "linux")]
     {
         println!(
             "cargo::rustc-link-arg=-Wl,-rpath,{0},-L{0}",
             link_path.to_string_lossy()
         );
     }
+
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR specified");
+    let _out_dir_path = PathBuf::from(out_dir);
+
 
     // Read Cargo.lock to extract the version of a dependency
     let lock = fs::read_to_string("Cargo.lock").unwrap();

@@ -8,19 +8,37 @@ BinYars is a Binary Ninja Plugin which intergrates YARA-X into Binary Ninja - 2 
 
 This plugin comes in 2 parts.
 
-**Rust Component**
+### Rust Component
 
 This handles all of the Yara-X scanning and the Binary Ninja folder sorting and compilation of the Yara-X rules.
 
-Steps:
+
+#### Build on Linux
+
+Requires rustup, sqlite3-dev
 
 - Clone repo
-
 - In the root of  the repo, run `cargo build --release`
+- Copy (or better yet symlink) the `libbinyars.so` file to the Binary Ninja plugin dir.  On linux this is under: `~/.binaryninja/plugins/`
 
-- Copy (or better yet symlink) the `libbinyars.[so|dll|dyno]` file to the Binary Ninja plugin dir.  On linux this is under: `~/.binaryninja/plugins/`
 
-**Python Component**
+#### Build on Windows
+
+Requires Visual Studio, rustup, clang
+
+- Generate sqlite3.lib: See this [gist](https://gist.github.com/zeljic/d8b542788b225b1bcb5fce169ee28c55#file-build_sqlite3_lib-md)
+- Add a environment variable called "THIRD_PARTY_LIB_PATH" and set it to the directory sqlite3.lib resides in
+- Clone repo
+- In the root of  the repo, run `cargo build --release`
+- Copy the `libbinyars.dll` file to the Binary Ninja plugin dir.  On Windows this is under: `%appdata%/.binaryninja/plugins/`
+
+
+#### Build on MacOS
+
+...
+
+
+### Python Component
 
 This is all of the code for the Sidebar Widget as it's easier to write Qt Widgets in Python versus Rust (didn't even try).  It will make calls to the rust component to do scanning and other YARA-X things.
 
@@ -29,7 +47,7 @@ Steps:
 - Install the Python library dependencies from `binyars-sidewidgit/requirements.txt` to your Binary Ninja Python environment.
 - Copy the folder (or better yet symlink) `binyars-sidewidgit` to the Binary Ninja plugin dir.
 
-**Post Installation**
+## Post Installation
 
 Set directory the plugin will use to find the .yar files in.
 
@@ -39,7 +57,7 @@ Set directory the plugin will use to find the .yar files in.
 
 ## Features
 
-**Project Level**
+### Project Level
 
 *Note: This component requires Binary Ninja Commerical version or higher, as projects are not supported in other versions.*
 
@@ -65,7 +83,7 @@ These are all found in the right click menu in the project view.
   
   - Runs all of the compiled rules against all of the files in the project. The results are avaliable in the description and can be viewed at the file level using the BinYars sidebar widget.
 
-**File Level**
+### File Level
 
 *Note: Works with Binary Ninja Personal and higher.*
 
