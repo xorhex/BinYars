@@ -977,7 +977,7 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
 
         log::debug!("    BNDB file path on disk: {}", path_str);
 
-        let Some(original_file_id) = get_original_file_id(path_str) else {
+        let Ok(Some(original_file_id)) = get_original_file_id(path_str) else {
             log::error!("    Failed to get original file id from BNDB");
             continue;
         };

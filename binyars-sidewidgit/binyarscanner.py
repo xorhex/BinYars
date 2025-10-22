@@ -13,11 +13,13 @@ import json
 
 import yara_x as yr
 
-logger = Logger(session_id=0, logger_name=__name__)
+from .constants import (
+    PLUGIN_RULES_SERIALIZED_FILE,
+    PLUGIN_SETTINGS_DIR,
+    PLUGIN_SETTINGS_NAME,
+)
 
-PLUGIN_RULES_SERIALIZED_FILE = "yarax.compiled.bin"
-PLUGIN_SETTINGS_DIR = "BinYars Settings.Yara-X Directory.dir"
-PLUGIN_SETTINGS_NAME = "BinYars Settings.BinYars Rust Lib.name"
+logger = Logger(session_id=0, logger_name=__name__)
 
 
 @dataclass

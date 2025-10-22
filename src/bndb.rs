@@ -4,8 +4,11 @@ use rusqlite::{
     types::{FromSql, FromSqlError, ValueRef},
     Connection, Result,
 };
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 
-const SQL_GET_ORGINAL_FILE_ID: &str = "SELECT value FROM global WHERE name = 'project_binary_id'";
+const SQL_GET_ORIGINAL_FILE_ID: &str =
+    "SELECT value FROM global WHERE name = 'project_binary_id' LIMIT 1";
 
 #[derive(Debug)]
 pub struct ProjectBinary {
@@ -47,43 +50,28 @@ impl FromSql for ProjectBinary {
     }
 }
 
-pub fn get_original_file_id(db: &str) -> Option<ProjectBinary> {
-    // Open your SQLite database
-    match Connection::open(db) {
-        Ok(conn) => match conn.prepare(SQL_GET_ORGINAL_FILE_ID) {
-            Ok(mut stmt) => match stmt.query_map([], |row| {
-                let pb: rusqlite::Result<ProjectBinary> = row.get(0);
-                pb
-            }) {
-                Ok(iter) => {
-                    for pb in iter {
-                        match pb {
-                            Ok(pb) => {
-                                log::debug!("Found pb");
-                                return Some(pb);
-                            }
-                            Err(e) => {
-                                log::error!("Error getting pb: {}", e);
-                                return None;
-                            }
-                        }
-                    }
-                    return None;
-                }
-                Err(e) => {
-                    log::error!("Error getting pb iter: {}", e);
-                    return None;
-                }
-            },
-            Err(e) => {
-                log::error!("Error stmt: {}", e);
-                return None;
-            }
-        },
-        Err(e) => {
-            log::error!("Error making connection: {}", e);
-            return None;
+pub fn get_original_file_id(db: &str) -> Result<Option<ProjectBinary>> {
+    let conn = Connection::open(db)?;
+
+    let result = conn.query_row(SQL_GET_ORIGINAL_FILE_ID, [], |row| {
+        let data: Vec<u8> = row.get(0)?;
+        if data.len() < 4 {
+            log::warn!("Invalid binary data: too short ({} bytes)", data.len());
+            return Err(rusqlite::Error::InvalidQuery);
         }
+
+        let mut header = [0u8; 4];
+        header.copy_from_slice(&data[..4]);
+        let content_bytes = &data[4..];
+        let content = String::from_utf8_lossy(content_bytes).to_string();
+
+        Ok(ProjectBinary { header, content })
+    });
+
+    match result {
+        Ok(pb) => Ok(Some(pb)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
     }
 }
 
@@ -113,4 +101,32 @@ pub fn is_project_folder_empty_of_folders(proj: &Project, folder_id: &str) -> bo
             .map(|folder_ref| folder_ref.as_ref().id() == folder_id)
             .unwrap_or(false)
     })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_original_file_id_from_bndb(db_path: *const c_char) -> *const c_char {
+    if db_path.is_null() {
+        log::error!("get_original_file_id_from_bndb: null db_path");
+        return CString::new("").unwrap().into_raw();
+    }
+
+    let c_str = unsafe { CStr::from_ptr(db_path) };
+    let db = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            log::error!("get_original_file_id_from_bndb: invalid UTF-8 in db_path");
+            return CString::new("").unwrap().into_raw();
+        }
+    };
+
+    match get_original_file_id(db) {
+        Ok(Some(pb)) => CString::new(pb.content)
+            .unwrap_or_else(|_| CString::new("").unwrap())
+            .into_raw(),
+        Ok(None) => CString::new("").unwrap().into_raw(),
+        Err(e) => {
+            log::error!("get_original_file_id_from_bndb: {e}");
+            CString::new("").unwrap().into_raw()
+        }
+    }
 }

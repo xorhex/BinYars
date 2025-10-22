@@ -31,40 +31,34 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QImage, QPainter, QColor, QFontMetrics, QPen
 
 from binaryninja.log import Logger
-from binaryninja import BinaryView, Settings
+from binaryninja import BinaryView, Settings, user_plugin_path
 
-import sqlite3
 import ast
 import json
 import threading
 import re
 from enum import Enum
 import os
+from os import path
 import platform
 from collections import defaultdict
+import ctypes
+from ctypes import c_void_p, c_char_p
 
 from .binyarscanner import BinYarScanner, Identifier, ConsoleEntry, ConsoleEntryGroup
 from .binyarseditor import CodeEditorWidget
 from .state import StateInfo
 from .binyarsdiraboutwidget import YaraRulesDirWidget
+from .constants import (
+    KEY,
+    TEMPKEY,
+    PLUGIN_SETTINGS_DIR,
+    PLUGIN_SETTINGS_NAME,
+    DEFAULT_RULE_TEMPLATE,
+)
 
 logger = Logger(session_id=0, logger_name=__name__)
 
-KEY = "BinYars"
-TEMPKEY = "BinYarsTempResults"
-PLUGIN_RULES_SERIALIZED_FILE = "yarax.compiled.bin"
-PLUGIN_SETTINGS_DIR = "BinYars Settings.Yara-X Directory.dir"
-DEFAULT_RULE_TEMPLATE = """rule <rule_name> {
-    meta:
-      BNFolder = ""
-      BNDescription = ""
-
-    strings:
-      
-    condition:
-      
-}
-"""
 state = StateInfo()
 
 
@@ -80,18 +74,38 @@ def get_os_alt():
         return "Unknown"
 
 
-def get_file_id(bv: BinaryView) -> str:
-    # bndb file, get the File ID from the sqlite db
+def get_file_id(bv: BinaryView):
     if bv.file is not None:
         if bv.file.database is not None:
-            with sqlite3.connect(bv.file.filename) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT value FROM global WHERE name = 'project_binary_id'"
+            lib = ctypes.CDLL(
+                path.join(
+                    user_plugin_path(),
+                    Settings().get_string(PLUGIN_SETTINGS_NAME),
                 )
-                row = cursor.fetchone()
-            return row[0][4:][1:-1].decode("utf-8") if row else None
-        # if file, then just get the File ID
+            )
+            # Define free_rust_string signature
+            lib.free_rust_string.argtypes = [c_void_p]
+            lib.free_rust_string.restype = None
+
+            lib.get_original_file_id_from_bndb.argtypes = [c_char_p]
+            lib.get_original_file_id_from_bndb.restype = c_void_p
+
+            filename_bytes = bv.file.filename.encode("utf-8")
+
+            result_ptr = lib.get_original_file_id_from_bndb(filename_bytes)
+
+            result = ctypes.string_at(result_ptr).decode("utf-8")
+
+            lib.free_rust_string(result_ptr)
+
+            logger.log_debug(
+                f"Found File ID {result} for BNDB file {bv.file.filename}."
+            )
+
+            if result.strip() == "":
+                return None
+
+            return result.strip()
         else:
             return "".join(bv.file.filename.split("/")[-2:])
 
