@@ -337,25 +337,24 @@ class BinYarsSidebarWidget(SidebarWidget):
         self.bv = None
         self.layout = QVBoxLayout()
 
+        def get_yara_dir_string():
+            ydir = Settings().get_string(PLUGIN_SETTINGS_DIR)
+            if ydir.strip() == "":
+                return f"NEEDS TO BE SET IN THE CONFIG: {PLUGIN_SETTINGS_DIR}"
+            else:
+                return ydir
+
         ## Controls to display to the use the current
         # Value fo Yara-X Rule Dir stored in the settings
-        self.binyarscandir_v1 = YaraRulesDirWidget(
-            Settings().get_string(PLUGIN_SETTINGS_DIR)
-        )
+        self.binyarscandir_v1 = YaraRulesDirWidget(get_yara_dir_string())
         self.binyarscandir_v1.refresh_button.clicked.connect(
-            lambda: self.binyarscandir_v1.update_label(
-                Settings().get_string(PLUGIN_SETTINGS_DIR)
-            )
+            lambda: self.binyarscandir_v1.update_label(get_yara_dir_string())
         )
 
         # Sadly can't use the same control twice so have to create a second one
-        self.binyarscandir_v2 = YaraRulesDirWidget(
-            Settings().get_string(PLUGIN_SETTINGS_DIR)
-        )
+        self.binyarscandir_v2 = YaraRulesDirWidget(get_yara_dir_string())
         self.binyarscandir_v2.refresh_button.clicked.connect(
-            lambda: self.binyarscandir_v2.update_label(
-                Settings().get_string(PLUGIN_SETTINGS_DIR)
-            )
+            lambda: self.binyarscandir_v2.update_label(get_yara_dir_string())
         )
         ## End Section
 

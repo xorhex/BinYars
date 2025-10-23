@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from binaryninja.log import Logger
 from .binyarscanner import BinYarScanner
 from .logo import BINYARS_LOGO_BASE64
+from .constants import PLUGIN_SETTINGS_DIR
 
 logger = Logger(session_id=0, logger_name=__name__)
 
@@ -38,7 +39,7 @@ class YaraRulesDirWidget(QWidget):
         if current_yara_rules_dir:
             self.update_label(current_yara_rules_dir)
         else:
-            self.update_label("NOT SET, MUST BE SET IN THE CONFIG UNDER BINYARS")
+            self.update_label(f"NEEDS TO BE SET IN THE CONFIG: {PLUGIN_SETTINGS_DIR}")
         layout.addWidget(self.yara_rules_dir)
 
         # Horizontal spacer to push the button to the right
