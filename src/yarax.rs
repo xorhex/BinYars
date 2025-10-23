@@ -10,7 +10,6 @@ use std::io::{Read, Write};
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::thread::spawn;
 use string_builder::Builder;
 use walkdir::WalkDir;
 use yara_x;

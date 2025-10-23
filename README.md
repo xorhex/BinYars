@@ -17,7 +17,7 @@ This handles all of the Yara-X scanning and the Binary Ninja folder sorting and 
 
 Requires rustup, sqlite3-dev
 
-- Clone repo
+- Clone repo this repo
 - In the root of  the repo, run `cargo build --release`
 - Copy (or better yet symlink) the `libbinyars.so` file to the Binary Ninja plugin dir.  On linux this is under: `~/.binaryninja/plugins/`
 
@@ -28,9 +28,9 @@ Requires Visual Studio, rustup, clang
 
 - Generate sqlite3.lib: See this [gist](https://gist.github.com/zeljic/d8b542788b225b1bcb5fce169ee28c55#file-build_sqlite3_lib-md)
 - Add a environment variable called "THIRD_PARTY_LIB_PATH" and set it to the directory sqlite3.lib resides in
-- Clone repo
+- Clone repo this repo
 - In the root of  the repo, run `cargo build --release`
-- Copy the `libbinyars.dll` file to the Binary Ninja plugin dir.  On Windows this is under: `%appdata%/.binaryninja/plugins/`
+- Copy `binyars.dll` and `sqlite3.dll` dllls into to the Binary Ninja plugin dir.  On Windows this is under: `%appdata%/.binaryninja/plugins/`
 
 
 #### Build on MacOS
