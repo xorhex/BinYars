@@ -109,6 +109,10 @@ class BinYarScanner:
     ):
         if yara_rule_dir is None:
             self.yar_dir = Settings().get_string(PLUGIN_SETTINGS_DIR)
+            if self.yar_dir.strip() == "":
+                logger.log_error(
+                    f"Rules folder path is empty - check settings for {PLUGIN_SETTINGS_DIR}"
+                )
         else:
             self.yar_dir = yara_rule_dir
         self.yar_compiled = path.join(self.yar_dir, PLUGIN_RULES_SERIALIZED_FILE)
@@ -161,6 +165,9 @@ class BinYarScanner:
             ctypes.c_char_p,
         ]
         self.lib.precompile_and_save_ffi.restype = ctypes.c_void_p
+
+    def is_yara_dir_set(self):
+        False if self.yar_dir.strip() == "" else True
 
     def get_yara_version(self):
         # Call the function

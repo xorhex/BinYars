@@ -131,6 +131,15 @@ struct ProjectRuleCompileCommand;
 impl ProjectCommand for ProjectRuleCompileCommand {
     fn action(&self, _proj: &Project) {
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+
+        if rule_folder.trim().is_empty() {
+            log::error!(
+                "Rules folder path is empty — check settings for `{}`",
+                PLUGIN_SETTING_DIR
+            );
+            return;
+        }
+
         let yara = yarax::Rules::new(PLUGIN_RULES_SERIALIZED_FILE, rule_folder.as_str());
         spawn(move || {
             let task = BackgroundTask::new("BinYars start", true);
@@ -156,6 +165,15 @@ struct RuleCompileCommand;
 impl Command for RuleCompileCommand {
     fn action(&self, _view: &BinaryView) {
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+
+        if rule_folder.trim().is_empty() {
+            log::error!(
+                "Rules folder path is empty — check settings for `{}`",
+                PLUGIN_SETTING_DIR
+            );
+            return;
+        }
+
         let yara = yarax::Rules::new(PLUGIN_RULES_SERIALIZED_FILE, rule_folder.as_str());
         spawn(move || {
             let task = BackgroundTask::new("BinYars start", true);
@@ -187,6 +205,15 @@ impl ProjectCommand for ScanCommand {
         log::info!("Scanning project: {}", proj.name());
         let project = proj.to_owned();
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+
+        if rule_folder.trim().is_empty() {
+            log::error!(
+                "Rules folder path is empty — check settings for `{}`",
+                PLUGIN_SETTING_DIR
+            );
+            return;
+        }
+
         spawn(move || {
             let task = BackgroundTask::new("BinYars start", true);
             let res = scanonly(&task, &project, &rule_folder);
@@ -238,6 +265,15 @@ impl ProjectCommand for SortCommand {
         log::info!("Scanning project: {}", proj.name());
         let project = proj.to_owned();
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+
+        if rule_folder.trim().is_empty() {
+            log::error!(
+                "Rules folder path is empty — check settings for `{}`",
+                PLUGIN_SETTING_DIR
+            );
+            return;
+        }
+
         let remove_empty_folders = Settings::new().get_bool(PLUGIN_SETTING_EMPTY_DIRY);
         spawn(move || {
             let task = BackgroundTask::new("BinYars start", true);

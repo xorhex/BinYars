@@ -1274,6 +1274,8 @@ class QScanResultsHitSection(QWidget):
 
         def worker():
             scanner = BinYarScanner()
+            if not scanner.is_yara_dir_set():
+                return
             if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
                 logger.log_debug(f"Saving hits: {hits}")
                 scanner.save(self.bv, hits, KEY)
@@ -1298,6 +1300,8 @@ class QScanResultsHitSection(QWidget):
 
         def worker():
             scanner = BinYarScanner()
+            if not scanner.is_yara_dir_set():
+                return
             scanner.precompile()
             if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
                 logger.log_debug(f"Saving hits: {hits}")
