@@ -10,6 +10,7 @@ use std::io::{Read, Write};
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::thread::spawn;
 use string_builder::Builder;
 use walkdir::WalkDir;
 use yara_x;
@@ -221,33 +222,35 @@ impl Rules {
     }
 
     fn save(&self, rules: &mut yara_x::Rules) -> Result<(), BinYarsError> {
-        let fullname = self.save_as.to_str().unwrap();
-        match File::create(fullname) {
-            Ok(mut file) => {
-                match rules.serialize() {
-                    Ok(bytes) => {
-                        // Write the byte data to the file
-                        match file.write_all(&bytes) {
-                            Ok(_) => {
-                                info!("Compiled YaraX rules written successfully to {}", fullname);
-                            }
-                            Err(e) => {
-                                return Err(BinYarsError::FileError { source: (e) });
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Error serializing yara rules : {}", e);
-                        return Err(BinYarsError::YaraRulesDeserilizationError { source: (e) });
-                    }
-                }
+        let fullname = match self.save_as.to_str() {
+            Some(name) => name,
+            None => {
+                log::error!("Invalid save path (non-UTF8)");
+                return Err(BinYarsError::FileError {
+                    source: std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Non-UTF8 file path",
+                    ),
+                });
             }
-            Err(e) => {
-                log::error!("Unable to create file : {}", e);
-                return Err(BinYarsError::FileError { source: (e) });
-            }
-        }
+        };
 
+        let mut file = File::create(fullname).map_err(|e| {
+            log::error!("Unable to create file: {}", e);
+            BinYarsError::FileError { source: e }
+        })?;
+
+        let bytes = rules.serialize().map_err(|e| {
+            log::error!("Error serializing YaraX rules: {}", e);
+            BinYarsError::YaraRulesDeserilizationError { source: e }
+        })?;
+
+        file.write_all(&bytes).map_err(|e| {
+            log::error!("Error writing serialized rules to {}: {}", fullname, e);
+            BinYarsError::FileError { source: e }
+        })?;
+
+        info!("Compiled YaraX rules written successfully to {}", fullname);
         Ok(())
     }
 
@@ -786,4 +789,45 @@ pub extern "C" fn get_library_versions_json() -> *const c_char {
     };
 
     result.into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn precompile_and_save_ffi(
+    plugin_name: *const c_char,
+    rule_folder: *const c_char,
+    yara_compiled_file_name: *const c_char,
+) -> i32 {
+    // Safety: check for null pointers
+    if plugin_name.is_null() || rule_folder.is_null() || yara_compiled_file_name.is_null() {
+        log::error!("Null pointer passed to precompile_and_save_ffi");
+        return 0;
+    }
+
+    // Convert C strings to Rust strings
+    let plugin_name_str = unsafe { CStr::from_ptr(plugin_name) }
+        .to_string_lossy()
+        .to_string();
+    let rule_folder_str = unsafe { CStr::from_ptr(rule_folder) }
+        .to_string_lossy()
+        .to_string();
+    let yara_file_str = unsafe { CStr::from_ptr(yara_compiled_file_name) }
+        .to_string_lossy()
+        .to_string();
+
+    let task = BackgroundTask::new("BinYars Rule Compile Start", true);
+    let yara = Rules::new(yara_file_str, rule_folder_str);
+
+    let result = yara.compile_and_save(&task);
+    task.finish();
+
+    match result {
+        Ok(_) => {
+            log::info!("{}: Compilation successful", plugin_name_str);
+            1
+        }
+        Err(e) => {
+            log::error!("Error compiling {}: {:?}", plugin_name_str, e);
+            0
+        }
+    }
 }

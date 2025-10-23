@@ -11,12 +11,11 @@ import os
 from os import path
 import json
 
-import yara_x as yr
-
 from .constants import (
     PLUGIN_RULES_SERIALIZED_FILE,
     PLUGIN_SETTINGS_DIR,
     PLUGIN_SETTINGS_NAME,
+    PLUGIN_NAME,
 )
 
 logger = Logger(session_id=0, logger_name=__name__)
@@ -155,6 +154,14 @@ class BinYarScanner:
 
         self.lib.get_library_versions_json.restype = ctypes.c_void_p
 
+        # precompile_and_save(PluginName, Yara Rule Path, Compiled Rules File)
+        self.lib.precompile_and_save_ffi.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+        ]
+        self.lib.precompile_and_save_ffi.restype = ctypes.c_void_p
+
     def get_yara_version(self):
         # Call the function
         result_ptr = self.lib.get_library_versions_json()
@@ -170,22 +177,10 @@ class BinYarScanner:
         return versions
 
     def precompile(self):
-        if self.yar_dir is not None:
-            compiler = yr.Compiler()
-            for yar in self._file_yara_files(self.yar_dir):
-                with open(yar, "r") as f:
-                    compiler.add_source(f.read(), yar)
-            rules = compiler.build()
-            with open(self.yar_compiled, "wb") as f:
-                rules.serialize_into(f)
-
-    def _file_yara_files(self, dir):
-        yar_files = []
-        for root, dirs, files in os.walk(dir):
-            for file in files:
-                if file.lower().endswith(".yar"):
-                    yar_files.append(os.path.join(root, file))
-        return yar_files
+        plugin_c = PLUGIN_NAME.encode("utf-8")
+        folder_c = self.yar_dir.encode("utf-8")
+        rules_c = self.yar_compiled.encode("utf-8")
+        return self.lib.precompile_and_save_ffi(plugin_c, folder_c, rules_c)
 
     def get_metadata_string_field(self, meta: dict, field_name: str) -> str | None:
         """
@@ -197,26 +192,6 @@ class BinYarScanner:
                     if isinstance(value, str):  # equivalent to MetaValue::String
                         return value
         return None
-
-    def get_patterns(self, patterns, raw_bytes) -> list[Pattern]:
-        """
-        Convert yara_x::Patterns into a list of Pattern objects.
-        """
-        hit_patterns: list[Pattern] = []
-
-        m: yr.Pattern
-        for m in patterns:  # iterate over patterns
-            n: yr.Match
-            for n in m.matches:  # iterate over matches
-                hit_patterns.append(
-                    Pattern(
-                        identifier=m.identifier,
-                        offset=n.offset,
-                        length=n.length,
-                        data=[d for d in raw_bytes[n.offset : n.offset + n.length]],
-                    )
-                )
-        return hit_patterns
 
     def scan(self, raw_bytes):
         # Prepare inputs

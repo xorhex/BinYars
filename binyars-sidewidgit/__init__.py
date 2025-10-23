@@ -10,7 +10,7 @@ logger = Logger(session_id=0, logger_name=__name__)
 def get_os_libbinyars():
     os_name = platform.system()
     if os_name == "Windows":
-        return "libbinyars.dll"
+        return "binyars.dll"
     elif os_name == "Linux":
         return "libbinyars.so"
     elif os_name == "Darwin":
