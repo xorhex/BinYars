@@ -45,7 +45,6 @@ import ast
 import json
 import threading
 import re
-from enum import Enum
 import os
 from os import path
 import platform
@@ -65,6 +64,7 @@ from .constants import (
     PLUGIN_SETTINGS_NAME,
     DEFAULT_RULE_TEMPLATE,
 )
+from .status import Status
 
 logger = Logger(session_id=0, logger_name=__name__)
 
@@ -117,12 +117,6 @@ def get_file_id(bv: BinaryView):
             return result.strip()
         else:
             return "".join(bv.file.filename.split("/")[-2:])
-
-
-class Status(Enum):
-    GREEN = "green"
-    YELLOW = "yellow"
-    RED = "red"
 
 
 class StatusLight(QWidget):
@@ -388,13 +382,19 @@ class BinYarsSidebarWidget(SidebarWidget):
 
         self.editor = QScanRuleEditSection()
 
-        def view_temp_rule_results(bv):
-            if self.hit_section.get_data(bv, temp_data_only=True):
-                logger.log_debug("Switching to Scan Results Tab")
-                self.tabs.setCurrentIndex(
-                    self.get_tab_index_by_name(self.tabs, "Scan Results")
+        def view_temp_rule_results(bv: BinaryView):
+            if bv.file.database:
+                if self.hit_section.get_data(bv, temp_data_only=True):
+                    logger.log_debug("Switching to Scan Results Tab")
+                    self.tabs.setCurrentIndex(
+                        self.get_tab_index_by_name(self.tabs, "Scan Results")
+                    )
+                    self.set_tab_icon()
+            else:
+                self.editor.status.setLabelAndStatus(
+                    "Need a bndb file in order to view the results",
+                    Status.RED,
                 )
-                self.set_tab_icon()
 
         self.editor.viewScanResultsRequested.connect(
             lambda bv: view_temp_rule_results(bv)
@@ -411,8 +411,8 @@ class BinYarsSidebarWidget(SidebarWidget):
         """Toggle icon visibility and tooltip."""
         tabText = "Scan Results"
         index = self.get_tab_index_by_name(self.tabs, tabText)
-        global state
         if current_file_id := get_file_id(self.bv):
+            global state
             if state.get_last_update(current_file_id):
                 logger.log_debug("Setting icon on tab")
                 self.tabs.setTabIcon(index, amber_alert_icon_pixmap())  # show icon
@@ -597,6 +597,7 @@ class ScanResults:
                             logger.log_debug(
                                 f"Loading File Level Hits: Rule `{item['rule']}` already added, skipping.."
                             )
+                    logger.log_debug(f"Rules found {results}")
                 else:
                     logger.log_debug("Key is not of type string")
         if self.bv.project is not None:
