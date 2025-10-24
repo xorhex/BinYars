@@ -11,6 +11,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
+from binaryninja.interaction import get_directory_name_input
+from binaryninja import Settings
+
 from binaryninja.log import Logger
 from .binyarscanner import BinYarScanner
 from .logo import BINYARS_LOGO_BASE64
@@ -36,10 +39,6 @@ class YaraRulesDirWidget(QWidget):
 
         # QLabel For Value
         self.yara_rules_dir = QLabel()
-        if current_yara_rules_dir:
-            self.update_label(current_yara_rules_dir)
-        else:
-            self.update_label(f"NEEDS TO BE SET IN THE CONFIG: {PLUGIN_SETTINGS_DIR}")
         layout.addWidget(self.yara_rules_dir)
 
         # Horizontal spacer to push the button to the right
@@ -55,6 +54,8 @@ class YaraRulesDirWidget(QWidget):
         self.refresh_button = QPushButton("Refresh")
         layout.addWidget(self.refresh_button)
 
+        self.update_label(current_yara_rules_dir)
+
         # Info button
         self.info_button = QPushButton()
         self.info_button.setIcon(
@@ -66,9 +67,46 @@ class YaraRulesDirWidget(QWidget):
         # Connect info button to popup
         self.info_button.clicked.connect(self.show_info_popup)
 
-    def update_label(self, text: str):
+    def update_label(self, text: str, prompt: bool = False):
         """Helper method to update the QLabel text."""
-        self.yara_rules_dir.setText(text)
+
+        if text.strip() == "":
+            if prompt:
+                if text := self.yar_dir_prompt():
+                    self.yara_rules_dir.setText(text)
+                    self.refresh_button.setText("Refresh")
+                    self.refresh_button.setIcon(
+                        self.style().standardIcon(
+                            QStyle.StandardPixmap.SP_BrowserReload
+                        )
+                    )
+                else:
+                    self.yara_rules_dir.setText("NEED TO SET")
+                    self.refresh_button.setText("Set Dir")
+                    self.refresh_button.setIcon(
+                        self.style().standardIcon(
+                            QStyle.StandardPixmap.SP_MessageBoxWarning
+                        )
+                    )
+            else:
+                self.yara_rules_dir.setText("NEED TO SET")
+                self.refresh_button.setText("Set Dir")
+                self.refresh_button.setIcon(
+                    self.style().standardIcon(
+                        QStyle.StandardPixmap.SP_MessageBoxWarning
+                    )
+                )
+        else:
+            self.yara_rules_dir.setText(text)
+            self.refresh_button.setText("Refresh")
+            self.refresh_button.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
+            )
+
+    def yar_dir_prompt(self):
+        if result := get_directory_name_input("Select the yara rules folder to use:"):
+            Settings().set_string(PLUGIN_SETTINGS_DIR, result)
+        return result
 
     def show_info_popup(self):
         """Show a rich-text popup with information about BinYars."""

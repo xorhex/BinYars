@@ -7,7 +7,15 @@ from binaryninjaui import (
     ViewFrame,
 )
 
-from PySide6.QtCore import Qt, QRectF, QSize, Property, Signal, Slot, QObject
+from PySide6.QtCore import (
+    Qt,
+    QRectF,
+    QSize,
+    Property,
+    Signal,
+    Slot,
+    QObject,
+)
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLayout,
@@ -28,7 +36,7 @@ from PySide6.QtWidgets import (
     QStyle,
     QSpacerItem,
 )
-from PySide6.QtGui import QImage, QPainter, QColor, QFontMetrics, QPen
+from PySide6.QtGui import QImage, QPainter, QColor, QFontMetrics, QPen, QPixmap, QIcon
 
 from binaryninja.log import Logger
 from binaryninja import BinaryView, Settings, user_plugin_path
@@ -44,6 +52,7 @@ import platform
 from collections import defaultdict
 import ctypes
 from ctypes import c_void_p, c_char_p
+from base64 import b64decode
 
 from .binyarscanner import BinYarScanner, Identifier, ConsoleEntry, ConsoleEntryGroup
 from .binyarseditor import CodeEditorWidget
@@ -325,6 +334,26 @@ class IdentifierWidget(QWidget):
         self.setStyleSheet("QWidget { background: transparent; }")
 
 
+def amber_alert_icon_pixmap(size=24):
+    """Return scalable amber '!' pixmap."""
+    amber_svg = b"""
+    PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVp
+    Z2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2
+    IiByPSIxNSIgc3Ryb2tlPSIjZDY3YzAwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9IiNmZmNh
+    MDAiIC8+CiAgPHJlY3QgeD0iMTUiIHk9IjkiIHdpZHRoPSIyIiBoZWlnaHQ9IjEwIiBmaWxs
+    PSIjNjY2NjY2Ii8+CiAgPGNpcmNsZSBjeD0iMTYiIGN5PSIyMyIgcj0iMS41IiBmaWxsPSIj
+    NjY2NjY2Ii8+Cjwvc3ZnPg==
+    """
+    pixmap = QPixmap()
+    pixmap.loadFromData(b64decode(amber_svg), "SVG")
+    return pixmap.scaled(
+        size,
+        size,
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    )
+
+
 # Sidebar widgets must derive from SidebarWidget, not QWidget.
 # SidebarWidget is a QWidget but
 # provides callbacks for sidebar events, and must be created with a title.
@@ -337,32 +366,25 @@ class BinYarsSidebarWidget(SidebarWidget):
         self.bv = None
         self.layout = QVBoxLayout()
 
-        def get_yara_dir_string():
-            ydir = Settings().get_string(PLUGIN_SETTINGS_DIR)
-            if ydir.strip() == "":
-                return f"NEEDS TO BE SET IN THE CONFIG: {PLUGIN_SETTINGS_DIR}"
-            else:
-                return ydir
-
+        yar_dir = Settings().get_string(PLUGIN_SETTINGS_DIR)
         ## Controls to display to the use the current
         # Value fo Yara-X Rule Dir stored in the settings
-        self.binyarscandir_v1 = YaraRulesDirWidget(get_yara_dir_string())
-        self.binyarscandir_v1.refresh_button.clicked.connect(
-            lambda: self.binyarscandir_v1.update_label(get_yara_dir_string())
-        )
-
-        # Sadly can't use the same control twice so have to create a second one
-        self.binyarscandir_v2 = YaraRulesDirWidget(get_yara_dir_string())
-        self.binyarscandir_v2.refresh_button.clicked.connect(
-            lambda: self.binyarscandir_v2.update_label(get_yara_dir_string())
+        self.binyarscandir = YaraRulesDirWidget(yar_dir)
+        self.binyarscandir.refresh_button.clicked.connect(
+            lambda: self.binyarscandir.update_label(
+                Settings().get_string(PLUGIN_SETTINGS_DIR), True
+            )
         )
         ## End Section
 
         self.tabs = QTabWidget()
         self.hit_details = QScanResultSelectedSection()
         self.hit_section = QScanResultsHitSection(self.hit_details)
-        tab1 = QTab([self.hit_section, self.binyarscandir_v1])
-        _ = self.tabs.addTab(tab1, "Scan Results")
+        self.hit_section.refreshButtonClicked.connect(self.set_tab_icon)
+        tab1 = QTab([self.hit_section])
+        _ = self.tabs.addTab(tab1, QIcon(), "Scan Results")
+
+        self.tab_icon_tooltip = "Rule Editor Scan Results Showing"
 
         self.editor = QScanRuleEditSection()
 
@@ -372,16 +394,33 @@ class BinYarsSidebarWidget(SidebarWidget):
                 self.tabs.setCurrentIndex(
                     self.get_tab_index_by_name(self.tabs, "Scan Results")
                 )
+                self.set_tab_icon()
 
         self.editor.viewScanResultsRequested.connect(
             lambda bv: view_temp_rule_results(bv)
         )
 
-        tab2 = QTab([self.editor, self.binyarscandir_v2])
+        tab2 = QTab([self.editor])
         _ = self.tabs.addTab(tab2, "Rule Editor")
 
         self.layout.addWidget(self.tabs)
+        self.layout.addWidget(self.binyarscandir)
         self.setLayout(self.layout)
+
+    def set_tab_icon(self):
+        """Toggle icon visibility and tooltip."""
+        tabText = "Scan Results"
+        index = self.get_tab_index_by_name(self.tabs, tabText)
+        global state
+        if current_file_id := get_file_id(self.bv):
+            if state.get_last_update(current_file_id):
+                logger.log_debug("Setting icon on tab")
+                self.tabs.setTabIcon(index, amber_alert_icon_pixmap())  # show icon
+                self.tabs.setTabToolTip(index, self.tab_icon_tooltip)  # restore tooltip
+            else:
+                logger.log_debug("Setting icon off tab")
+                self.tabs.setTabIcon(index, QIcon())  # hide icon
+                self.tabs.setTabToolTip(index, "")  # clear tooltip
 
     def notifyViewChanged(self, view_frame):
         global state
@@ -401,6 +440,7 @@ class BinYarsSidebarWidget(SidebarWidget):
                 self.hit_details.update_bv(self.bv)
                 self.editor.update_bv(self.bv)
                 state.last_loaded_bv_file = current_file_id
+                self.set_tab_icon()
         else:
             self.bv = None
 
@@ -807,7 +847,9 @@ class QScanRuleEditSection(QWidget):
         logger.log_debug("Running scan")
         scanner = BinYarScanner()
         self.editor.clearAllLineStatuses()
-        if error_msg := scanner.rule_compiles(self.editor.text()):
+        if self.editor.text().strip() == "":
+            self.status.setLabelAndStatus("No rule text entered", Status.RED)
+        elif error_msg := scanner.rule_compiles(self.editor.text()):
             # Add statuses with messages
             line_no, error_no, msg, col_num = parse_yarax_error(error_msg)
             self.status.setLabelAndStatus(f"Compile error: {error_no}", Status.RED)
@@ -840,7 +882,9 @@ class QScanRuleEditSection(QWidget):
         logger.log_debug("Running scan and viewing results")
         scanner = BinYarScanner()
         self.editor.clearAllLineStatuses()
-        if error_msg := scanner.rule_compiles(self.editor.text()):
+        if self.editor.text().strip() == "":
+            self.status.setLabelAndStatus("No rule text entered", Status.RED)
+        elif error_msg := scanner.rule_compiles(self.editor.text()):
             # Add statuses with messages
             line_no, error_no, msg, col_num = parse_yarax_error(error_msg)
             self.status.setLabelAndStatus(f"Compile error: {error_no}", Status.RED)
@@ -892,7 +936,9 @@ class QScanRuleEditSection(QWidget):
             self.status.setLabelAndStatus(f"Compile error: {error_no}", Status.RED)
             self.editor.setLineStatus(line_no, "red", msg, col_num)
         else:
-            if fmt_rule := scanner.rule_fmt(self.editor.text()):
+            if self.editor.text().strip() == "":
+                self.status.setLabelAndStatus("Nothing to format", Status.RED)
+            elif fmt_rule := scanner.rule_fmt(self.editor.text()):
                 if self.editor.text() == fmt_rule:
                     self.status.setLabelAndStatus("No Change", Status.YELLOW)
                 else:
@@ -920,7 +966,9 @@ class QScanRuleEditSection(QWidget):
                     f.write(self.editor.text())
                 self.status.setLabelAndStatus(f"Saved to {path}", Status.GREEN)
             else:
-                self.status.setLabelAndStatus("You forgot to write a rule", Status.RED)
+                self.status.setLabelAndStatus(
+                    "You forgot to write a rule, nothing saved", Status.RED
+                )
             return path
 
 
@@ -1116,6 +1164,8 @@ class ComboActionButton(QWidget):
 
 
 class QScanResultsHitSection(QWidget):
+    refreshButtonClicked = Signal()
+
     def __init__(self, details: QScanResultSelectedSection):
         super(QScanResultsHitSection, self).__init__()
         self.details = details
@@ -1261,6 +1311,7 @@ class QScanResultsHitSection(QWidget):
         logger.log_debug("Reload clicked")
         if self.bv is not None:
             self.get_data(self.bv, True)
+            self.refreshButtonClicked.emit()
 
     def rescan_action(self):
         logger.log_debug("Scan Only clicked")

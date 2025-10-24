@@ -167,7 +167,7 @@ class BinYarScanner:
         self.lib.precompile_and_save_ffi.restype = ctypes.c_void_p
 
     def is_yara_dir_set(self):
-        False if self.yar_dir.strip() == "" else True
+        False if Settings().get_string(PLUGIN_SETTINGS_DIR) == "" else True
 
     def get_yara_version(self):
         # Call the function

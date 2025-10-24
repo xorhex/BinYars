@@ -7,7 +7,7 @@ TEMPKEY = "BinYarsTempResults"
 DEFAULT_RULE_TEMPLATE = """rule <rule_name> {
     meta:
       BNFolder = ""
-      BNDescription = ""
+      Description = ""
 
     strings:
       
