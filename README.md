@@ -35,7 +35,10 @@ Requires Visual Studio, rustup, clang
 
 #### Build on MacOS
 
-...
+- Install rustup
+- Clone this repo
+- In the root of the checked out repo, run `cargo build --release`
+- Copy (or bettter yet symlink) the `libbinyars.dylib` into the Binary Ninja plugin dir.  On MacOS this is under: `~/Library/Application\ Support/Binary\ Ninja/plugins`
 
 
 ### Python Component
