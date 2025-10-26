@@ -33,6 +33,11 @@ class Pattern:
 class ConsoleLog:
     data: Dict[str, str] = field(default_factory=dict)
 
+    def to_console_entry(self):
+        return ConsoleEntry(
+            list(self.data.keys())[0], self.data[list(self.data.keys())[0]]
+        )
+
 
 @dataclass
 class MetaRule:
@@ -167,6 +172,9 @@ class BinYarScanner:
         self.lib.precompile_and_save_ffi.restype = ctypes.c_void_p
 
     def is_yara_dir_set(self):
+        logger.log_debug(
+            f"Yara Dir check: {Settings().get_string(PLUGIN_SETTINGS_DIR)}"
+        )
         False if Settings().get_string(PLUGIN_SETTINGS_DIR) == "" else True
 
     def get_yara_version(self):
@@ -220,11 +228,13 @@ class BinYarScanner:
 
         # If empty string -> treat as error/no results
         if result.strip() == "":
+            logger.log_info("No results found")
             return None
 
         # Otherwise parse JSON
         try:
             raw_list = json.loads(result)
+            logger.log_debug(f"Results returned from libbinyars: {raw_list}")
             return [
                 MetaRule(
                     rule=mr["rule"],
@@ -238,7 +248,7 @@ class BinYarScanner:
                         )
                         for p in mr.get("identifiers", [])
                     ],
-                    console=[ConsoleEntry(data=c) for c in mr.get("console", [])],
+                    console=[ConsoleLog(data=c) for c in mr.get("console", [])],
                 )
                 for mr in raw_list
             ]
@@ -283,7 +293,7 @@ class BinYarScanner:
                         )
                         for p in mr.get("identifiers", [])
                     ],
-                    console=[ConsoleEntry(data=c) for c in mr.get("console", [])],
+                    console=[ConsoleLog(data=c) for c in mr.get("console", [])],
                 )
                 for mr in raw_list
             ]
@@ -292,6 +302,7 @@ class BinYarScanner:
             return None
 
     def save(self, bv: BinaryView, hits: list[MetaRule], key: str):
+        logger.log_debug(f"Saving Json: {hits}")
         bv.store_metadata(key, json.dumps([asdict(mr) for mr in hits]))
 
     def get_module_fields(self, raw_bytes):
@@ -320,3 +331,6 @@ class BinYarScanner:
         if result.strip() == "":
             return None
         return result
+
+    def clear_results(self, bv: BinaryView, key: str):
+        bv.store_metadata(key, "")

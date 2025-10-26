@@ -16,40 +16,6 @@ pub struct ProjectBinary {
     pub content: String, // remaining bytes as UTF-8 string
 }
 
-impl FromSql for ProjectBinary {
-    fn column_result(value: ValueRef<'_>) -> Result<Self, FromSqlError> {
-        match value {
-            ValueRef::Blob(bytes) => {
-                if bytes.len() < 4 {
-                    return Err(FromSqlError::Other(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "blob too short",
-                    ))));
-                }
-
-                let header: [u8; 4] = bytes[0..4]
-                    .try_into()
-                    .map_err(|_| FromSqlError::Other("failed to extract header".into()))?;
-
-                let content_bytes = &bytes[4..];
-                let mut content = String::from_utf8_lossy(content_bytes).to_string();
-                if content.starts_with('"') {
-                    if let Some(content1) = content.strip_prefix('"') {
-                        if content1.ends_with('"') {
-                            if let Some(content2) = content1.strip_suffix('"') {
-                                content = content2.to_string();
-                            }
-                        }
-                    }
-                }
-
-                Ok(ProjectBinary { header, content })
-            }
-            _ => Err(FromSqlError::InvalidType),
-        }
-    }
-}
-
 pub fn get_original_file_id(db: &str) -> Result<Option<ProjectBinary>> {
     let conn = Connection::open(db)?;
 
@@ -63,7 +29,16 @@ pub fn get_original_file_id(db: &str) -> Result<Option<ProjectBinary>> {
         let mut header = [0u8; 4];
         header.copy_from_slice(&data[..4]);
         let content_bytes = &data[4..];
-        let content = String::from_utf8_lossy(content_bytes).to_string();
+        let mut content = String::from_utf8_lossy(content_bytes).to_string();
+        if content.starts_with('"') {
+            if let Some(content1) = content.strip_prefix('"') {
+                if content1.ends_with('"') {
+                    if let Some(content2) = content1.strip_suffix('"') {
+                        content = content2.to_string();
+                    }
+                }
+            }
+        }
 
         Ok(ProjectBinary { header, content })
     });

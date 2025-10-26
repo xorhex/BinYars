@@ -53,7 +53,13 @@ import ctypes
 from ctypes import c_void_p, c_char_p
 from base64 import b64decode
 
-from .binyarscanner import BinYarScanner, Identifier, ConsoleEntry, ConsoleEntryGroup
+from .binyarscanner import (
+    BinYarScanner,
+    Identifier,
+    ConsoleEntry,
+    ConsoleEntryGroup,
+    ConsoleLog,
+)
 from .binyarseditor import CodeEditorWidget
 from .state import StateInfo
 from .binyarsdiraboutwidget import YaraRulesDirWidget
@@ -857,6 +863,7 @@ class QScanRuleEditSection(QWidget):
             self.editor.setLineStatus(line_no, "red", msg, col_num)
         else:
             if self.bv:
+                logger.log_debug("Binary View Exist: Running Scan")
 
                 def worker():
                     results_json = scanner.scan_rule_against_bytes(
@@ -878,6 +885,8 @@ class QScanRuleEditSection(QWidget):
 
                 thread = WorkerHeartbeatThread(worker)
                 thread.start()
+            else:
+                logger.log_error("Binary View not set, can't scan.")
 
     def run_scan_view_results(self):
         logger.log_debug("Running scan and viewing results")
@@ -892,6 +901,8 @@ class QScanRuleEditSection(QWidget):
             self.editor.setLineStatus(line_no, "red", msg, col_num)
         else:
             if self.bv:
+                scanner.clear_results(self.bv, TEMPKEY)
+                logger.log_debug("Binary View Exist: Running Scan")
 
                 def worker():
                     results_json = scanner.scan_rule_against_bytes(
@@ -921,6 +932,8 @@ class QScanRuleEditSection(QWidget):
                 thread = WorkerHeartbeatThread(worker, on_complete)
                 thread.signals.finished.connect(self.on_scan_finished_view_results)
                 thread.start()
+            else:
+                logger.log_error("Binary View not set, can't scan.")
 
     @Slot()
     def on_scan_finished_view_results(self):
@@ -1234,7 +1247,7 @@ class QScanResultsHitSection(QWidget):
         previous_rule = self.hit_dropdown.currentText()
 
         # Check if refresh is needed
-        if set(items) != set(current_items) or force:
+        if set(items) != set(current_items) or force or temp_data_only:
             logger.log_debug(f"Updating dropdown rule list: {items}")
             self.hit_dropdown.clear()
             self.details.clear()
@@ -1253,6 +1266,10 @@ class QScanResultsHitSection(QWidget):
                     logger.log_debug(
                         "Previous rule not found; defaulted to first item."
                     )
+        else:
+            logger.log_debug(
+                f"Not reloading data - Item Set: {set(items) != set(current_items)} Force: {force}  Temp Results: {temp_data_only}"
+            )
         # Capture state information
         state.update(get_file_id(self.bv), temp_data_only)
 
@@ -1293,8 +1310,10 @@ class QScanResultsHitSection(QWidget):
                 # Step 1: Create ConsoleEntry objects
                 console_entries: list[ConsoleEntry] = []
                 for entry in rule["console"]:
-                    for key, value in entry.items():
-                        console_entries.append(ConsoleEntry(key, value))
+                    for _, value in entry.items():
+                        console_entries.append(
+                            ConsoleLog(data=value).to_console_entry()
+                        )
 
                 # Step 2: Group entries by parent field
                 grouped_dict = defaultdict(list)
@@ -1322,23 +1341,29 @@ class QScanResultsHitSection(QWidget):
                     "Must save the the binary first to create the\nbndb file in order to scan the file."
                 )
                 return
-
-        def worker():
-            scanner = BinYarScanner()
-            if not scanner.is_yara_dir_set():
-                return
-            if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
-                logger.log_debug(f"Saving hits: {hits}")
-                scanner.save(self.bv, hits, KEY)
             else:
-                logger.log_debug("No hits to save")
 
-        def on_complete():
-            logger.log_debug("Refreshing results after scanning")
+                def worker():
+                    scanner = BinYarScanner()
+                    if scanner.is_yara_dir_set():
+                        logger.log_debug("Yara directory is not set")
+                        return
+                    if hits := scanner.scan(
+                        self.bv.file.raw.read(0, self.bv.file.raw.length)
+                    ):
+                        logger.log_debug(f"Saving hits: {hits}")
+                        scanner.save(self.bv, hits, KEY)
+                    else:
+                        logger.log_debug("No hits to save")
 
-        thread = WorkerHeartbeatThread(worker, on_complete)
-        thread.signals.finished.connect(self.on_scan_finished)
-        thread.start()
+                def on_complete():
+                    logger.log_debug("Refreshing results after scanning")
+
+                thread = WorkerHeartbeatThread(worker, on_complete)
+                thread.signals.finished.connect(self.on_scan_finished)
+                thread.start()
+        else:
+            logger.log_error("Binary View not set so can't scan")
 
     def compile_rescan_action(self):
         logger.log_debug("Compile + Scan clicked")
@@ -1348,29 +1373,36 @@ class QScanResultsHitSection(QWidget):
                     "Must save the the binary first to create the\nbndb file in order to scan the file."
                 )
                 return
-
-        def worker():
-            scanner = BinYarScanner()
-            if not scanner.is_yara_dir_set():
-                return
-            scanner.precompile()
-            if hits := scanner.scan(self.bv.file.raw.read(0, self.bv.file.raw.length)):
-                logger.log_debug(f"Saving hits: {hits}")
-                scanner.save(self.bv, hits, KEY)
             else:
-                logger.log_debug("No hits to save")
 
-        def on_complete():
-            logger.log_debug("Refreshing results after recompiling and scanning")
+                def worker():
+                    scanner = BinYarScanner()
+                    if scanner.is_yara_dir_set():
+                        logger.log_debug("Yara directory is not set")
+                        return
+                    scanner.precompile()
+                    if hits := scanner.scan(
+                        self.bv.file.raw.read(0, self.bv.file.raw.length)
+                    ):
+                        logger.log_debug(f"Saving hits: {hits}")
+                        scanner.save(self.bv, hits, KEY)
+                    else:
+                        logger.log_debug("No hits to save")
 
-        thread = WorkerHeartbeatThread(worker, on_complete)
-        thread.signals.finished.connect(self.on_scan_finished)
-        thread.start()
+                def on_complete():
+                    logger.log_debug(
+                        "Refreshing results after recompiling and scanning"
+                    )
+
+                thread = WorkerHeartbeatThread(worker, on_complete)
+                thread.signals.finished.connect(self.on_scan_finished)
+                thread.start()
 
     @Slot()
     def on_scan_finished(self):
         if self.bv is not None:
             self.get_data(self.bv, True)
+            self.refreshButtonClicked.emit()
 
 
 class WorkerSignalBridge(QObject):

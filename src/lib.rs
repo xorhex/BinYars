@@ -1024,7 +1024,7 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
         let Some(binary_file_id) = proj.file_by_id(&original_file_id.content).map(|f| f.id())
         else {
             log::error!(
-                "    Could not find binary project file for {}",
+                "    Could not find binary project file matching id: {}",
                 original_file_id.content
             );
             continue;
@@ -1098,7 +1098,7 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
                 if let Some(path_str) = fullpath.as_path().to_str() {
                     // Read the BNDB file to get the Global project_binary_id
                     log::debug!("    BNDB file path on disk {}", path_str);
-                    if let Some(pb) = get_original_file_id(&path_str) {
+                    if let Ok(Some(pb)) = get_original_file_id(&path_str) {
                         //get location of binary file
                         log::debug!("    Original file id {}", pb.content);
                         if let Some(binary_proj_file) = &proj.file_by_id(&pb.content) {
