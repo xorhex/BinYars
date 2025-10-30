@@ -39,18 +39,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QImage, QPainter, QColor, QFontMetrics, QPen, QPixmap, QIcon
 
 from binaryninja.log import Logger
-from binaryninja import BinaryView, Settings, user_plugin_path
-
+from binaryninja import BinaryView, Settings
 import ast
 import json
 import threading
 import re
 import os
-from os import path
 import platform
 from collections import defaultdict
-import ctypes
-from ctypes import c_void_p, c_char_p
 from base64 import b64decode
 
 from .binyarscanner import (
@@ -67,7 +63,6 @@ from .constants import (
     KEY,
     TEMPKEY,
     PLUGIN_SETTINGS_DIR,
-    PLUGIN_SETTINGS_NAME,
     DEFAULT_RULE_TEMPLATE,
 )
 from .status import Status
@@ -89,38 +84,10 @@ def get_os_alt():
         return "Unknown"
 
 
-def get_file_id(bv: BinaryView):
+def get_original_file_id(bv: BinaryView):
     if bv.file is not None:
         if bv.file.database is not None:
-            lib = ctypes.CDLL(
-                path.join(
-                    user_plugin_path(),
-                    Settings().get_string(PLUGIN_SETTINGS_NAME),
-                )
-            )
-            # Define free_rust_string signature
-            lib.free_rust_string.argtypes = [c_void_p]
-            lib.free_rust_string.restype = None
-
-            lib.get_original_file_id_from_bndb.argtypes = [c_char_p]
-            lib.get_original_file_id_from_bndb.restype = c_void_p
-
-            filename_bytes = bv.file.filename.encode("utf-8")
-
-            result_ptr = lib.get_original_file_id_from_bndb(filename_bytes)
-
-            result = ctypes.string_at(result_ptr).decode("utf-8")
-
-            lib.free_rust_string(result_ptr)
-
-            logger.log_debug(
-                f"Found File ID {result} for BNDB file {bv.file.filename}."
-            )
-
-            if result.strip() == "":
-                return None
-
-            return result.strip()
+            return bv.file.database.read_global("project_binary_id").strip('"')
         else:
             return "".join(bv.file.filename.split("/")[-2:])
 
@@ -417,7 +384,7 @@ class BinYarsSidebarWidget(SidebarWidget):
         """Toggle icon visibility and tooltip."""
         tabText = "Scan Results"
         index = self.get_tab_index_by_name(self.tabs, tabText)
-        if current_file_id := get_file_id(self.bv):
+        if current_file_id := get_original_file_id(self.bv):
             global state
             if state.get_last_update(current_file_id):
                 logger.log_debug("Setting icon on tab")
@@ -435,7 +402,7 @@ class BinYarsSidebarWidget(SidebarWidget):
             view = view_frame.getCurrentViewInterface()
             self.bv = view.getData()
             logger.log_debug(f"View changed to: {self.bv.file.view}")
-            current_file_id = get_file_id(self.bv)
+            current_file_id = get_original_file_id(self.bv)
             if state.last_loaded_file_id != current_file_id:
                 # Get the last used metadata key for the current_file_id
                 # this is needed to restore the correct yara-x result set
@@ -585,7 +552,7 @@ class AutoResizingTextEdit(QTextEdit):
 class ScanResults:
     def __init__(self, bv: BinaryView):
         self.bv = bv
-        self.file_id = get_file_id(self.bv)
+        self.file_id = get_original_file_id(self.bv)
 
     def get_scan_results(self, key: str = KEY) -> list[str]:
         logger.log_debug(f"Getting scan results for {self.file_id} under key {key}")
@@ -1271,7 +1238,7 @@ class QScanResultsHitSection(QWidget):
                 f"Not reloading data - Item Set: {set(items) != set(current_items)} Force: {force}  Temp Results: {temp_data_only}"
             )
         # Capture state information
-        state.update(get_file_id(self.bv), temp_data_only)
+        state.update(get_original_file_id(self.bv), temp_data_only)
 
         return True if self.data else False
 

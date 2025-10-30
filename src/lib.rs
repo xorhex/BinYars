@@ -1018,14 +1018,13 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
             continue;
         };
 
-        log::debug!("    Original file id: {}", original_file_id.content);
+        log::debug!("    Original file id: {}", original_file_id);
 
         // Get binary file again (short-lived borrow)
-        let Some(binary_file_id) = proj.file_by_id(&original_file_id.content).map(|f| f.id())
-        else {
+        let Some(binary_file_id) = proj.file_by_id(&original_file_id).map(|f| f.id()) else {
             log::error!(
                 "    Could not find binary project file matching id: {}",
-                original_file_id.content
+                original_file_id
             );
             continue;
         };
@@ -1083,66 +1082,6 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
         }
     }
 }
-
-/*
-fn move_bndb_files_to_binary_file_location(proj: &Project) {
-    log::info!("Moving bndb files");
-    // Move BNDB file to sit next to their corrisponding file
-    get_project_bndb_files(&proj).into_iter().for_each(|id| {
-        // Get BNDB File
-        log::info!("  Found bndb file {}", id);
-        if let Some(bndb_proj_file) = &proj.file_by_id(&id) {
-            // Get the Full path on Disk to BNDB file
-            if let Some(fullpath) = bndb_proj_file.clone().path_on_disk() {
-                // Get the path as string
-                if let Some(path_str) = fullpath.as_path().to_str() {
-                    // Read the BNDB file to get the Global project_binary_id
-                    log::debug!("    BNDB file path on disk {}", path_str);
-                    if let Ok(Some(pb)) = get_original_file_id(&path_str) {
-                        //get location of binary file
-                        log::debug!("    Original file id {}", pb.content);
-                        if let Some(binary_proj_file) = &proj.file_by_id(&pb.content) {
-                            // if not at the same location as the bndb id
-                            log::debug!("    Found original file named {}", binary_proj_file.name());
-                            if let Some(bndb_project_path) =
-                                bndb_proj_file.path_in_project().as_path().to_str()
-                            {
-                                if let Some(binary_proj_path) =
-                                    binary_proj_file.path_in_project().as_path().to_str()
-                                {
-                                    if binary_proj_path != bndb_project_path {
-                                        log::debug!("    Binary Project Path {} does NOT match BNDB Project Path {}", binary_proj_path, bndb_project_path);
-                                        // move bndb id to binary id location
-                                        bndb_proj_file.set_folder(proj.folder_by_id(&binary_proj_file.folder().unwrap().id()).as_deref());
-                                        log::info!("    BinaryNinja DB file {} moved to {}", bndb_project_path, binary_proj_file.folder().unwrap().name());
-                                    } else {
-                                        log::info!("    BinaryNinja DB file {} does NOT need to be moved", bndb_project_path);
-                                    }
-                                } else {
-                                    log::error!("    Failed to get binary_project_path");
-                                }
-                            } else {
-                                log::error!("    Failed to get bndb_project_path");
-                            }
-                        } else {
-                            log::error!("    Failed to get original file id from bndb");
-                        }
-                    } else {
-                        log::error!("    Failed to get original file id");
-                    }
-                } else {
-                    log::error!("    Failed to get bndb_proj_file path on disk string");
-                }
-            } else {
-                log::error!("    Failed to get bndb_proj_file path on disk");
-            }
-        } else {
-            log::error!("    Failed to get bndb_proj_file");
-        }
-
-    });
-}
-*/
 
 /// Removes all text blocks between the BinYar rule markers (inclusive) from a given string.
 ///

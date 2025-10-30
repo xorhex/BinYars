@@ -40,13 +40,6 @@ impl Pattern {
             data,
         }
     }
-
-    pub fn description(&self) -> String {
-        format!(
-            "Identifier: {}\n  Offset: {}\n  Length: {}\n  Data: {}",
-            self.identifier, self.offset, self.length, self.data
-        )
-    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
