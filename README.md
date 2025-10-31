@@ -24,13 +24,11 @@ Requires: rustup, sqlite3-dev
 
 #### Build on Windows
 
-Requires Visual Studio, rustup, clang
+Requires rustup, clang
 
-- Generate sqlite3.lib: See this [gist](https://gist.github.com/zeljic/d8b542788b225b1bcb5fce169ee28c55#file-build_sqlite3_lib-md)
-- Add a environment variable called "THIRD_PARTY_LIB_PATH" and set it to the directory sqlite3.lib resides in
 - Clone repo this repo
 - In the root of  the repo, run `cargo build --release`
-- Copy `binyars.dll` and `sqlite3.dll` dllls into to the Binary Ninja plugin dir.  On Windows this is under: `%appdata%/.binaryninja/plugins/`
+- Copy `binyars.dll` into to the Binary Ninja plugin dir.  On Windows this is under: `%appdata%/.binaryninja/plugins/`
 
 
 #### Build on MacOS
@@ -73,6 +71,8 @@ These are all found in the right click menu in the project view.
 - Oracle of Order (Scan + Sort)
   
   - **WARNING**: *This will reorganize the Binary Ninja Project folder structure and files, proceed with caution!*
+
+  - **DISCLAIMER**: *This will open each bndb file to get the corrisponding project binary id.  The bndb files are loaded with `update_analysis_and_wait` set to `false`. According to Vector35, this will _not_ modify any analysis but it may trigger a schema version update.  All that said, I use this feature all of the time, but be aware that it may modify the bndb file.*
   
   - Runs all of the compiled rules against all of the files in a project and then sorts them into folders based upon the metadata in the rule. Also makes the scan data available in the file's project description.
   
@@ -183,7 +183,7 @@ rule this_rule_has_been_taken {
 
 - Determine if the current view is part of a project, if so - do not register (or maybe just invalidate it) the Compile Rules plugin option.  This command is needed for instances of Binary Ninja that do not support projects.  
   
-  - So for now there are 2 commands that do the same  thing: 
+  - So for now there are 2 commands that do the same thing: 
     
     - Brew (Compile)
     
@@ -191,4 +191,4 @@ rule this_rule_has_been_taken {
 
 ## Disclaimers
 
-In order to complete this in a timely fashion amoungst other things in life, *vide coding* was used for significate portions of this plugin. I mean, who wants to hand craft Python Qt widgets or is maybe a Rust n00b. O' and [MIT License](./LICENSE)
+In order to complete this in a timely fashion amoungst other things in life, *vide coding* was used for significate portions of this plugin. I mean, who wants to hand craft Python Qt widgets or is maybe a Rust n00b. That said, I've done my best to try and make sure there are no adverse side effects with this plugin; however, proceed to use at your own risk - O' and [MIT License](./LICENSE)

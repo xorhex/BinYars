@@ -1,21 +1,24 @@
 use anyhow::{anyhow, Result};
+use std::path::Path;
 
 use binaryninja::binary_view::BinaryViewExt;
+use binaryninja::file_metadata::FileMetadata;
+use binaryninja::is_database;
 use binaryninja::project::Project;
-use binaryninja::{is_database, load_with_options};
 
-pub fn get_original_file_id(db: &str) -> Result<Option<String>> {
-    let bv = match load_with_options(db, false, Some("")) {
-        Some(val) => val,
-        None => return Ok(None),
-    };
+pub fn get_original_file_id(bndb: &str) -> Result<Option<String>> {
+    let bv = FileMetadata::new()
+        .open_database_for_configuration(Path::new(bndb))
+        .map_err(|e| anyhow!("Failed to open database {}: {:?}", bndb, e))?;
 
     let fmeta = bv.file();
 
     // `database()` returns Option<Ref<Database>>
     let Some(fdb) = fmeta.database() else {
+        fmeta.close();
         return Err(anyhow!("Database not found"));
     };
+    fmeta.close();
 
     let bn_str = match fdb.read_global("project_binary_id") {
         Some(val) => val,

@@ -453,7 +453,7 @@ fn sort_by_rule_folder_name(
 
     // Move the bndb files to be next to their corrisponding binary
     task.set_progress_text(&format!("{} - Moving BNDB Files", PLUGIN_NAME));
-    move_bndb_files_to_binary_file_location(&proj);
+    move_bndb_files_to_binary_file_location(task, &proj);
 
     if task.is_cancelled() {
         log::info!("Task cancelled by user.");
@@ -986,15 +986,24 @@ fn move_unmatched_file_to_root_dir(proj: &Project, hits: &[FileHits]) {
 ///   the original binary’s project ID.
 /// - It uses helper functions such as [`get_project_bndb_files`] and
 ///   [`get_original_file_id`] to identify and match files.
-fn move_bndb_files_to_binary_file_location(proj: &Project) {
+fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project) {
     log::info!("Moving BNDB files");
 
-    for id in get_project_bndb_files(proj) {
+    let bndb_files = get_project_bndb_files(proj);
+
+    let total = bndb_files.len();
+    let counter = Arc::new(AtomicUsize::new(0));
+
+    bndb_files.par_iter().for_each(|id| {
+        if task.is_cancelled() {
+            return; // silently stop this worker
+        }
+
         log::info!("  Found BNDB file {}", id);
 
         let Some(bndb_id) = proj.file_by_id(&id).map(|f| f.id()) else {
             log::error!("    Failed to get BNDB project file");
-            continue;
+            return;
         };
 
         // Get path on disk
@@ -1002,20 +1011,20 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
             Some(p) => p,
             None => {
                 log::error!("    Failed to get BNDB file path on disk");
-                continue;
+                return;
             }
         };
 
         let Some(path_str) = fullpath.as_path().to_str() else {
             log::error!("    Failed to convert BNDB path to string");
-            continue;
+            return;
         };
 
         log::debug!("    BNDB file path on disk: {}", path_str);
 
         let Ok(Some(original_file_id)) = get_original_file_id(path_str) else {
             log::error!("    Failed to get original file id from BNDB");
-            continue;
+            return;
         };
 
         log::debug!("    Original file id: {}", original_file_id);
@@ -1026,7 +1035,7 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
                 "    Could not find binary project file matching id: {}",
                 original_file_id
             );
-            continue;
+            return;
         };
 
         let (bndb_project_path, binary_project_path) = {
@@ -1047,7 +1056,7 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
                 (Some(a), Some(b)) => (a, b),
                 _ => {
                     log::error!("    Failed to get project paths");
-                    continue;
+                    return;
                 }
             }
         };
@@ -1064,7 +1073,7 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
                 .and_then(|f| f.folder().map(|fld| fld.id()))
             else {
                 log::error!("    Binary file has no folder associated with it");
-                continue;
+                return;
             };
 
             if let Some(bndb_file) = proj.file_by_id(&bndb_id) {
@@ -1079,8 +1088,17 @@ fn move_bndb_files_to_binary_file_location(proj: &Project) {
             }
         } else {
             log::info!("    BinaryNinja DB file {} already in correct folder", id);
+            return;
         }
-    }
+
+        // update progress counter
+        let finished = counter.fetch_add(1, Ordering::SeqCst) + 1;
+        let percent = (finished * 100) / total.max(1);
+        task.set_progress_text(&format!(
+            "{} - Moving bndb files {}% complete",
+            PLUGIN_NAME, percent
+        ));
+    });
 }
 
 /// Removes all text blocks between the BinYar rule markers (inclusive) from a given string.
