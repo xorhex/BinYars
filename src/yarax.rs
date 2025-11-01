@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Result};
 use binaryninja::background_task::BackgroundTask;
+use jaq_interpret::{Ctx, FilterT, ParseCtx, RcIter, Val};
 use log::info;
-use serde_json::json;
+use serde_json::{json, Value as JsonValue};
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -308,7 +309,76 @@ impl Rules {
 pub struct Scanner;
 
 impl Scanner {
-    pub fn module_info(bytes: &[u8]) -> String {
+    fn query_module_info(bytes: &[u8], queries: &[(&str, &str)]) -> HashMap<String, JsonValue> {
+        return Scanner::apply_aliased_jaq_queries(Scanner::module_info(bytes).as_str(), queries);
+    }
+
+    fn convert_val_to_json(val: Val) -> JsonValue {
+        match val {
+            Val::Null => JsonValue::Null,
+            Val::Bool(b) => JsonValue::Bool(b),
+            Val::Int(n) => JsonValue::Number(n.into()), // Ensure n is convertible to serde_json::Number
+            Val::Num(num) => JsonValue::String(num.to_string()),
+            Val::Str(s) => JsonValue::String(s.to_string()),
+            Val::Arr(arr) => JsonValue::Array(
+                arr.iter()
+                    .map(|v| Scanner::convert_val_to_json(v.clone()))
+                    .collect(),
+            ),
+            Val::Float(float) => JsonValue::from(float),
+            Val::Obj(obj) => {
+                let mut map = serde_json::map::Map::new();
+                for (key, value) in obj.iter() {
+                    map.insert(key.to_string(), Scanner::convert_val_to_json(value.clone()));
+                }
+                JsonValue::Object(map)
+            }
+        }
+    }
+
+    pub fn apply_aliased_jaq_queries(
+        json_str: &str,
+        queries: &[(&str, &str)],
+    ) -> HashMap<String, JsonValue> {
+        let mut results = HashMap::new();
+
+        let input_value: JsonValue = match serde_json::from_str(json_str) {
+            Ok(v) => v,
+            Err(_) => return results,
+        };
+
+        for (alias, query_str) in queries {
+            let (parsed, errs) = jaq_parse::parse(query_str, jaq_parse::main());
+            if parsed.is_none() {
+                // Could log errors here
+                results.insert(alias.to_string(), JsonValue::Null);
+                continue;
+            }
+
+            let mut defs = ParseCtx::new(Vec::new());
+            let filter = defs.compile(parsed.unwrap());
+
+            let mut out_vals = vec![];
+            let inputs = RcIter::new(core::iter::empty());
+            for output in filter.run((Ctx::new([], &inputs), Val::from(input_value.clone()))) {
+                if let Ok(v) = output {
+                    out_vals.push(Scanner::convert_val_to_json(v));
+                }
+            }
+
+            let result_value = match out_vals.len() {
+                0 => JsonValue::Null,
+                1 => out_vals[0].clone(),
+                _ => JsonValue::Array(out_vals),
+            };
+
+            results.insert(alias.to_string(), result_value);
+        }
+
+        results
+    }
+
+    fn module_info(bytes: &[u8]) -> String {
         let mut compiler = yara_x::Compiler::new();
         compiler
             .add_source(r#"import "pe" import "elf" import "lnk" import "macho" import "dotnet" rule test {condition: true}"#)
