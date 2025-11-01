@@ -146,11 +146,11 @@ Think of `sr` as short for String Rendering.
 
 `BNSettings = "!sr:<$string_name>"` 
 
-
-
 Multiple string rendering can be disabled using this, just seperate each setting with a `|` inside the `bnsettings` meta field.
 
 `BNSettings = "!sr:<$string_name>|!sr:<$string_name>"`
+
+
 
 ### Console Module
 
@@ -159,6 +159,8 @@ The plugin can surface `console.[log|hex]` messages, but the strings must match 
 ```
 console.hex("BN|rule:<rule name>|<ValueName>: ", <value>)
 ```
+
+
 
 All console messages are parsed as follows:
 
@@ -183,8 +185,8 @@ All console messages are parsed as follows:
       - Both of these values will be combined into 1 entry in the sidebar widget under Shellcode
   
   - The value name **Offset** is special. When used, it will make the entry in the sidebar widget interactive; so when clicked upon, it will goto that location in the binary.
-  
-  - The value name **Length** is also special when paired with **Offset**.  When both are used, the entry in the sidebar will also contain those bytes.
+    
+    
 
 **Example Rule**
 
@@ -210,8 +212,6 @@ rule this_rule_has_been_taken {
 ```
 
 ## 
-
-
 
 ## TODOs
 
