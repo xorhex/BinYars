@@ -12,7 +12,6 @@ This plugin comes in 2 parts.
 
 This handles all of the Yara-X scanning and the Binary Ninja folder sorting and compilation of the Yara-X rules.
 
-
 #### Build on Linux
 
 Requires: rustup, sqlite3-dev
@@ -20,7 +19,6 @@ Requires: rustup, sqlite3-dev
 - Clone repo this repo
 - In the root of  the repo, run `cargo build --release`
 - Copy (or better yet symlink) the `libbinyars.so` file to the Binary Ninja plugin dir.  On linux this is under: `~/.binaryninja/plugins/`
-
 
 #### Build on Windows
 
@@ -30,7 +28,6 @@ Requires rustup, clang
 - In the root of  the repo, run `cargo build --release`
 - Copy `binyars.dll` into to the Binary Ninja plugin dir.  On Windows this is under: `%appdata%/.binaryninja/plugins/`
 
-
 #### Build on MacOS
 
 Requires: rustup, Xcode
@@ -38,7 +35,6 @@ Requires: rustup, Xcode
 - Clone this repo
 - In the root of the checked out repo, run `cargo build --release`
 - Copy (or bettter yet symlink) the `libbinyars.dylib` into the Binary Ninja plugin dir.  On MacOS this is under: `~/Library/Application\ Support/Binary\ Ninja/plugins`
-
 
 ### Python Component
 
@@ -71,7 +67,7 @@ These are all found in the right click menu in the project view.
 - Oracle of Order (Scan + Sort)
   
   - **WARNING**: *This will reorganize the Binary Ninja Project folder structure and files, proceed with caution!*
-
+  
   - **DISCLAIMER**: *This will open each bndb file to get the corrisponding project binary id.  The bndb files are loaded with `update_analysis_and_wait` set to `false`. According to Vector35, this will _not_ modify any analysis but it may trigger a schema version update.  All that said, I use this feature all of the time, but be aware that it may modify the bndb file.*
   
   - Runs all of the compiled rules against all of the files in a project and then sorts them into folders based upon the metadata in the rule. Also makes the scan data available in the file's project description.
@@ -116,17 +112,49 @@ These are all found in the right click menu in the project view.
 
 ## Yara-X Rules
 
-**Meta Section**
+### Meta Section
 
-Add two fields to the meta section as needed.
+BinYars uses 3 Meta fields.
 
-- **bnfolder**: This is the folder name to assign all of the matches to in Binary Ninja's Project View
+**Note**: All field names are case insensitive.
 
-- **description**: The rule description to render inside of Binary Ninja.  
+#### BNFolder
 
-**Console Module**
+This is the folder name to assign all of the matches to in Binary Ninja's Project View
 
-The plugin can surface console.[log|hex] messages, but the strings must match this format for them to be picked up.
+#### Description
+
+The rule description to render inside of Binary Ninja.  
+
+### BNSettings
+
+#### Control String Rendering in the UI
+
+Rendering of all the string matches in the UI can be restricted via settings set in the BNSettings meta field. By default all string matches are rendered in the UI; however, sometimes this is not desired.
+
+
+
+**Disable All String Rendering**
+
+`BNSettings = "!sr"`
+
+Think of `sr` as short for String Rendering.
+
+
+
+**Disable Just One String From Being Rendered**
+
+`BNSettings = "!sr:<$string_name>"` 
+
+
+
+Multiple string rendering can be disabled using this, just seperate each setting with a `|` inside the `bnsettings` meta field.
+
+`BNSettings = "!sr:<$string_name>|!sr:<$string_name>"`
+
+### Console Module
+
+The plugin can surface `console.[log|hex]` messages, but the strings must match this format for them to be picked up.
 
 ```
 console.hex("BN|rule:<rule name>|<ValueName>: ", <value>)
@@ -155,6 +183,8 @@ All console messages are parsed as follows:
       - Both of these values will be combined into 1 entry in the sidebar widget under Shellcode
   
   - The value name **Offset** is special. When used, it will make the entry in the sidebar widget interactive; so when clicked upon, it will goto that location in the binary.
+  
+  - The value name **Length** is also special when paired with **Offset**.  When both are used, the entry in the sidebar will also contain those bytes.
 
 **Example Rule**
 
@@ -178,6 +208,10 @@ rule this_rule_has_been_taken {
         )
 }
 ```
+
+## 
+
+
 
 ## TODOs
 

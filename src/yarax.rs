@@ -48,6 +48,7 @@ pub struct MetaRule {
     pub desc: String,
     pub console: Vec<HashMap<String, String>>,
     pub folder: String,
+    pub settings: Vec<HashMap<String, Option<String>>>,
     pub identifiers: Vec<Pattern>,
 }
 
@@ -56,14 +57,16 @@ impl MetaRule {
         rule: String,
         desc: String,
         folder: String,
+        settings: Vec<HashMap<String, Option<String>>>,
         console: Vec<HashMap<String, String>>,
         identifiers: Vec<Pattern>,
     ) -> Self {
         Self {
             rule,
             desc,
-            console,
             folder,
+            settings,
+            console,
             identifiers,
         }
     }
@@ -361,6 +364,11 @@ impl Scanner {
                             get_metadata_string_field(h.metadata(), "Description")
                                 .unwrap_or_default(),
                             get_metadata_string_field(h.metadata(), "BNFolder").unwrap_or_default(),
+                            parse_bn_settings(
+                                get_metadata_string_field(h.metadata(), "BNSettings")
+                                    .unwrap_or_default()
+                                    .as_str(),
+                            ),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
                             get_patterns(h.patterns()),
                         )
@@ -429,6 +437,11 @@ impl Scanner {
                             get_metadata_string_field(h.metadata(), "Description")
                                 .unwrap_or_default(),
                             get_metadata_string_field(h.metadata(), "BNFolder").unwrap_or_default(),
+                            parse_bn_settings(
+                                get_metadata_string_field(h.metadata(), "BNSettings")
+                                    .unwrap_or_default()
+                                    .as_str(),
+                            ),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
                             get_patterns(h.patterns()),
                         )
@@ -464,15 +477,9 @@ fn has_yara_extension(path: &Path) -> bool {
 ///
 /// Expected format:
 /// ```text
-/// TB|key:value|key2:value2|...
+/// BN|key:value|key2:value2|...
 /// ```
 ///
-/// # Example
-/// ```
-/// let msg = "TB|event:start|file:test.exe".to_string();
-/// let map = parse_console_log_message(msg).unwrap();
-/// assert_eq!(map.get("event"), Some(&"start".to_string()));
-/// ```
 pub fn parse_console_log_message(msg: String) -> Result<HashMap<String, String>> {
     let trimmed = msg.trim();
 
@@ -519,6 +526,40 @@ pub fn parse_console_log_message(msg: String) -> Result<HashMap<String, String>>
     }
 
     Ok(map)
+}
+
+pub fn parse_bn_settings(input: &str) -> Vec<HashMap<String, Option<String>>> {
+    let mut vec_of_maps = Vec::new();
+
+    for item in input.split('|').filter(|s| !s.is_empty()) {
+        let parts: Vec<&str> = item.splitn(2, ':').collect();
+        let mut map = HashMap::new();
+
+        match parts.len() {
+            1 => {
+                // Only key, no value
+                map.insert(parts[0].trim().to_string(), None);
+                log::debug!("   Found Setting - {}", parts[0].trim().to_string());
+            }
+            2 => {
+                // Key-value pair
+                map.insert(
+                    parts[0].trim().to_string(),
+                    Some(parts[1].trim().to_string()),
+                );
+                log::debug!(
+                    "   Found Setting - {} : {:?}",
+                    parts[0].trim().to_string(),
+                    Some(parts[1].trim().to_string())
+                );
+            }
+            _ => continue, // shouldn't happen due to splitn(2)
+        }
+
+        vec_of_maps.push(map);
+    }
+
+    vec_of_maps
 }
 
 /// Filters logs by `rule_name` and removes the "rule" key from each map

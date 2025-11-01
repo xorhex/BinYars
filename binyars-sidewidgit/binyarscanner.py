@@ -17,6 +17,7 @@ from .constants import (
     PLUGIN_SETTINGS_NAME,
     PLUGIN_NAME,
 )
+from .binyarssettings import BinYarsSettings
 
 logger = Logger(session_id=0, logger_name=__name__)
 
@@ -43,8 +44,12 @@ class ConsoleLog:
 class MetaRule:
     rule: str
     desc: str
+    settings: List[Dict[str, str | None]] = field(default_factory=list)
     identifiers: List[Pattern] = field(default_factory=list)
     console: List[ConsoleLog] = field(default_factory=list)
+
+    def settings_to_BinYarsSettings(self):
+        return BinYarsSettings(self.settings)
 
 
 class Identifier:
@@ -70,7 +75,7 @@ class ConsoleEntry:
     def parent(self) -> str:
         """Everything before the last dot in the key, or the whole key if no dot."""
         if "." in self.key:
-            return " ".join(self.key.rsplit(".", 1)[0])
+            return "".join(self.key.rsplit(".", 1)[0])
         return self.key
 
     @property
@@ -239,6 +244,7 @@ class BinYarScanner:
                 MetaRule(
                     rule=mr["rule"],
                     desc=mr["desc"],
+                    settings=[s for s in mr.get("settings", [])],
                     identifiers=[
                         Pattern(
                             identifier=p["identifier"],
@@ -284,6 +290,7 @@ class BinYarScanner:
                 MetaRule(
                     rule=mr["rule"],
                     desc=mr["desc"],
+                    settings=[s for s in mr.get("settings", [])],
                     identifiers=[
                         Pattern(
                             identifier=p["identifier"],

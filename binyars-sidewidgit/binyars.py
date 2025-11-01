@@ -56,6 +56,7 @@ from .binyarscanner import (
     ConsoleEntryGroup,
     ConsoleLog,
 )
+from .binyarssettings import BinYarsSettings
 from .binyarseditor import CodeEditorWidget
 from .state import StateInfo
 from .binyarsdiraboutwidget import YaraRulesDirWidget
@@ -1010,6 +1011,7 @@ class QScanResultSelectedSection(QWidget):
         rule_desc: str,
         identifiers: list[Identifier],
         console_groups: list[ConsoleEntryGroup],
+        settings: BinYarsSettings,
     ):
         self.desc_label.setText(rule_desc)
         self.master_list_widget.clear()
@@ -1035,19 +1037,27 @@ class QScanResultSelectedSection(QWidget):
         if len(identifiers) > 0 and len(console_groups) > 0:
             self.add_separator()
 
-        logger.log_debug(f"Identifiers {identifiers}")
-        for idx, identifier in enumerate(identifiers):
-            item = QListWidgetItem(self.master_list_widget)
-            widget = IdentifierWidget(identifier, self.master_list_widget)
+        if settings.DoNotRenderAllStringMatches():
+            logger.log_debug("Not rendering string matches for this rule")
+        else:
+            logger.log_debug(f"Identifiers {identifiers}")
+            for idx, identifier in enumerate(identifiers):
+                if settings.DoNotRenderStringMatches(identifier.name):
+                    logger.log_debug(
+                        f"Not rendering string matches for {identifier.name}"
+                    )
+                else:
+                    item = QListWidgetItem(self.master_list_widget)
+                    widget = IdentifierWidget(identifier, self.master_list_widget)
 
-            # Set custom widget for the item
-            item.setSizeHint(widget.sizeHint())
-            item.setData(Qt.UserRole, identifier)
-            self.master_list_widget.addItem(item)
-            self.master_list_widget.setItemWidget(item, widget)
+                    # Set custom widget for the item
+                    item.setSizeHint(widget.sizeHint())
+                    item.setData(Qt.UserRole, identifier)
+                    self.master_list_widget.addItem(item)
+                    self.master_list_widget.setItemWidget(item, widget)
 
-            if idx < len(identifiers) - 1:
-                self.add_separator()
+                    if idx < len(identifiers) - 1:
+                        self.add_separator()
 
     def update_bv(self, bv: BinaryView):
         self.bv = bv
@@ -1292,7 +1302,10 @@ class QScanResultsHitSection(QWidget):
                     ConsoleEntryGroup(group, entries)
                     for group, entries in grouped_dict.items()
                 ]
-                self.details.update(rule["desc"], identifiers, console_groups)
+
+                # Step 4: Get Settings
+                settings = BinYarsSettings(rule["settings"])
+                self.details.update(rule["desc"], identifiers, console_groups, settings)
 
     def reload_action(self):
         logger.log_debug("Reload clicked")

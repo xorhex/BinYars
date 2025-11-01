@@ -1,6 +1,11 @@
 from .binyars import BinYarsSidebarWidgetType
 from binaryninjaui import Sidebar
-from binaryninja import Settings, Logger
+from binaryninja import Settings, Logger, user_plugin_path
+
+from pathlib import Path
+
+import os
+import shutil
 import json
 import platform
 
@@ -66,6 +71,26 @@ def register_settings() -> bool:
 if not register_settings():
     logger.log_error("Failed to initialize BinYars Sidebar Widget plugin settings")
 
+#################################################
+# Copy the binyars rust library up to the
+# root of the plugin folder
+#################################################
+lib = Path(os.path.join(user_plugin_path(), "binyars-sidewidgit", get_os_libbinyars()))
+if lib.exists():
+    shutil.move(lib.resolve(), os.path.join(user_plugin_path(), get_os_libbinyars()))
+    logger.log_alert(
+        "Hi, BinYars here!\n\n"
+        "First, Thank You for installing BinYars!\n\n"
+        "This is NOT an error; however, we are abusing this log alert feature\n"
+        "to let you know that the BinYars rust componenet has been installed\n"
+        "(aka. copied to the root of the plugin dir).\n\n"
+        "Restart BinaryNinja to load this BinYars rust instance into BinaryNinja.\n\n"
+        "Upon restarting BinaryNinja, this mesage should NOT reappear.\n\n"
+        "If there is a better way to install the rust component, please create\n"
+        "an issue here: https://github.com/xorhex/BinYars/issues\n\n"
+        "Happy YARA-X Rule Writing,\n"
+        "BinYars"
+    )
 
 #################################################
 # Binary Ninja BinYars Sidebar Widget
