@@ -68,7 +68,7 @@ These are all found in the right click menu in the project view.
   
   - **WARNING**: *This will reorganize the Binary Ninja Project folder structure and files, proceed with caution!*
   
-  - **DISCLAIMER**: *This will open each bndb file to get the corrisponding project binary id.  The bndb files are loaded with `update_analysis_and_wait` set to `false`. According to Vector35, this will _not_ modify any analysis but it may trigger a schema version update.  All that said, I use this feature all of the time, but be aware that it may modify the bndb file.*
+  - **DISCLAIMER**: *This will open each bndb file to get the corrisponding project binary id.  The bndb files are loaded using `FileMetadata::new().open_database_for_configuration()`. According to Vector35, this will _not_ modify any analysis but it may trigger a schema version update.  All that said, I use this feature all of the time, but just be aware that it may modify the bndb file.*
   
   - Runs all of the compiled rules against all of the files in a project and then sorts them into folders based upon the metadata in the rule. Also makes the scan data available in the file's project description.
   
@@ -76,7 +76,7 @@ These are all found in the right click menu in the project view.
   
   - Will save the scan results to the Binary Ninja's project metadata.
   
-  - https://github.com/user-attachments/assets/ca187cd6-f121-4b7c-902b-e593ec9942a5
+  - TODO
 
 - Scanning Sage (Scan Only)
   
@@ -93,6 +93,8 @@ These are all found in the right click menu in the project view.
     - Found under `Plugins` -> `BinYars` -> `Compile Rules`
 
 - Sidebar Widget (defaults to the right side)
+  
+  - TODO
   
   - View scan results
     
@@ -132,15 +134,11 @@ The rule description to render inside of Binary Ninja.
 
 Rendering of all the string matches in the UI can be restricted via settings set in the BNSettings meta field. By default all string matches are rendered in the UI; however, sometimes this is not desired.
 
-
-
 **Disable All String Rendering**
 
 `BNSettings = "!sr"`
 
 Think of `sr` as short for String Rendering.
-
-
 
 **Disable Just One String From Being Rendered**
 
@@ -150,8 +148,6 @@ Multiple string rendering can be disabled using this, just seperate each setting
 
 `BNSettings = "!sr:<$string_name>|!sr:<$string_name>"`
 
-
-
 ### Console Module
 
 The plugin can surface `console.[log|hex]` messages, but the strings must match this format for them to be picked up.
@@ -159,8 +155,6 @@ The plugin can surface `console.[log|hex]` messages, but the strings must match 
 ```
 console.hex("BN|rule:<rule name>|<ValueName>: ", <value>)
 ```
-
-
 
 All console messages are parsed as follows:
 
@@ -185,8 +179,6 @@ All console messages are parsed as follows:
       - Both of these values will be combined into 1 entry in the sidebar widget under Shellcode
   
   - The value name **Offset** is special. When used, it will make the entry in the sidebar widget interactive; so when clicked upon, it will goto that location in the binary.
-    
-    
 
 **Example Rule**
 

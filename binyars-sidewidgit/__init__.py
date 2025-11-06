@@ -91,6 +91,8 @@ if lib.exists():
         "Happy YARA-X Rule Writing,\n"
         "BinYars"
     )
+else:
+    logger.log_debug(f"{lib.resolve()} does not exists - nothing to install.")
 
 #################################################
 # Binary Ninja BinYars Sidebar Widget
