@@ -76,7 +76,8 @@ These are all found in the right click menu in the project view.
   
   - Will save the scan results to the Binary Ninja's project metadata.
   
-  - TODO
+  - [BinYarsScanSort.webm](https://github.com/user-attachments/assets/f2706e3e-6ed2-4a3b-be7f-75ee3be4b013)
+
 
 - Scanning Sage (Scan Only)
   
@@ -94,7 +95,8 @@ These are all found in the right click menu in the project view.
 
 - Sidebar Widget (defaults to the right side)
   
-  - TODO
+  - [binyars_sidebarwidget.webm](https://github.com/user-attachments/assets/5627adb1-fd4e-4108-833e-4955d0399585)
+
   
   - View scan results
     
