@@ -128,9 +128,9 @@ This is the folder name to assign all of the matches to in Binary Ninja's Projec
 
 The rule description to render inside of Binary Ninja.  
 
-### BNSettings
+#### BNSettings
 
-#### Control String Rendering in the UI
+##### Control String Rendering in the UI
 
 Rendering of all the string matches in the UI can be restricted via settings set in the BNSettings meta field. By default all string matches are rendered in the UI; however, sometimes this is not desired.
 
@@ -202,8 +202,6 @@ rule this_rule_has_been_taken {
         )
 }
 ```
-
-## 
 
 ## TODOs
 
