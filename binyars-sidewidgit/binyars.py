@@ -403,13 +403,16 @@ class BinYarsSidebarWidget(SidebarWidget):
                 self.tabs.setTabToolTip(index, "")  # clear tooltip
 
     def notifyViewChanged(self, view_frame):
-        global state
         logger.log_debug("View changed")
         if view_frame is not None:
             view = view_frame.getCurrentViewInterface()
             self.bv = view.getData()
             logger.log_debug(f"View changed to: {self.bv.file.view}")
+            self.hit_details.update_bv(self.bv)
+            self.editor.update_bv(self.bv)
+            self.hit_section.update_bv(self.bv)
             current_file_id = get_original_file_id(self.bv)
+            global state
             if state.last_loaded_file_id != current_file_id:
                 # Get the last used metadata key for the current_file_id
                 # this is needed to restore the correct yara-x result set
@@ -417,8 +420,6 @@ class BinYarsSidebarWidget(SidebarWidget):
                 self.hit_section.get_data(
                     self.bv, temp_data_only=state.get_last_update(current_file_id)
                 )
-                self.hit_details.update_bv(self.bv)
-                self.editor.update_bv(self.bv)
                 state.last_loaded_bv_file = current_file_id
                 self.set_tab_icon()
         else:
@@ -788,6 +789,7 @@ class QScanRuleEditSection(QWidget):
         self.bv = None
 
     def update_bv(self, bv):
+        logger.log_debug(f"QScanRuleEditSection binary view updated: {bv}")
         self.bv = bv
 
     # Connect click signal
@@ -1066,6 +1068,7 @@ class QScanResultSelectedSection(QWidget):
                         self.add_separator()
 
     def update_bv(self, bv: BinaryView):
+        logger.log_debug(f"QScanResultsSelectedSection binary view updated: {bv}")
         self.bv = bv
 
     def on_item_selected(self, item: QListWidgetItem):
@@ -1213,13 +1216,19 @@ class QScanResultsHitSection(QWidget):
         self.data = None
         self.bv = None
 
+    def update_bv(self, bv):
+        logger.log_debug(f"QScanResultsHitSection binary view updated: {bv}")
+        self.bv = bv
+
     def get_data(
         self,
         bv: BinaryView,
         force: bool = False,
         temp_data_only: bool = False,
     ) -> bool:
-        self.bv = bv
+        logger.log_debug(f"Binary View set: {bv}")
+        if bv is not None:
+            self.bv = bv
         self.data = ScanResults(self.bv).get_scan_results(
             TEMPKEY if temp_data_only else KEY
         )
@@ -1352,7 +1361,7 @@ class QScanResultsHitSection(QWidget):
             logger.log_error("Binary View not set, can't scan")
 
     def compile_rescan_action(self):
-        logger.log_debug("Compile + Scan clicked")
+        logger.log_debug(f"Compile + Scan clicked {self.bv}")
         if self.bv:
             if not self.bv.has_database:
                 logger.log_error(
@@ -1383,6 +1392,8 @@ class QScanResultsHitSection(QWidget):
                 thread = WorkerHeartbeatThread(worker, on_complete)
                 thread.signals.finished.connect(self.on_scan_finished)
                 thread.start()
+        else:
+            logger.log_error("Binary View not set, can't scan")
 
     @Slot()
     def on_scan_finished(self):
