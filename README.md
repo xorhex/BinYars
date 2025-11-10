@@ -83,6 +83,9 @@ These are all found in the right click menu in the project view.
   - Recommend enabling `Delete Empty Project Folders` when using this feature.
   
   - Will save the scan results to the Binary Ninja's project metadata.
+  
+  - [BinYarsScanSort.webm](https://github.com/user-attachments/assets/f2706e3e-6ed2-4a3b-be7f-75ee3be4b013)
+
 
 - Scanning Sage (Scan Only)
   
@@ -100,6 +103,8 @@ These are all found in the right click menu in the project view.
 
 - Sidebar Widget (defaults to the right side)
   
+  - [binyars_sidebarwidget.webm](https://github.com/user-attachments/assets/5627adb1-fd4e-4108-833e-4955d0399585)
+
   - View scan results
   
   - - ![](./pictures/BinYarsScanResultsSideWidget%20(Markup).png)
@@ -118,9 +123,9 @@ These are all found in the right click menu in the project view.
     
     - ![](./pictures/BinYarsRuleEditor%20(Markup).png)
     
-    - ![](/home/xorhex/src/BinYars/pictures/RuleEditorScanResultsShowing.png)
+    - ![](.//pictures/RuleEditorScanResultsShowing.png)
 
-![](/home/xorhex/src/BinYars/pictures/yara-dir.png)
+![](./pictures/yara-dir.png)
 
 ## Yara-X Rules
 
