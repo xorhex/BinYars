@@ -1,0 +1,21 @@
+{
+  "pluginmetadataversion": 2,
+  "name": "BinYars",
+  "author": "xorhex",
+  "type": ["helper"],
+  "api": ["python3", "rust"],
+  "description": "BinYars provides YARA-X scanning ability and a rule editor.  When running commerical or higher Binary Ninja edition, it can sort files in the project view.",
+  "longdescription": "BinYars intergrates YARA-X with Binary Ninja. BinYars comes in two parts, the rust library which is used for the YARA-X scanning and a Python sidewidget which acts as a front end to the Rust component.  The Python sidewidget provides both an interactive scanning interface along with a rule editor. For the commerical and higher Binary Ninja editions, the Rust component also will re-organize the binaries in the project view based off of metadata set in the YARA-X rules.",
+  "license": {
+    "name": "MIT",
+    "text": "Copyright 2025 xorhex\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+  },
+  "platforms": ["Darwin", "Windows", "Linux"],
+  "installinstructions": {
+    "Darwin": "",
+    "Windows": "",
+    "Linux": ""
+  },
+  "version": "v1.0",
+  "minimumbinaryninjaversion": 8587
+}

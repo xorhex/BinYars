@@ -134,10 +134,7 @@ class YaraRulesDirWidget(QWidget):
 
             <p><b>Developed By: </b><a href='https://blog.xorhex.com'>xorhex</a><p>
 
-            <p>A big THANK YOU to all of the initial testers helping to ensure a quality product out the door!</p>
-            <ul>
-                <li><a href='https://cxiao.net/'>cxiao</a></li>
-            </ul>
+            <p>Plus a big <b>THANK YOU</b> to <b><a href='https://cxiao.net/'>cxiao</a></b> who provided quality feedback, making the plugin even better!</p>
 
             <p>Check for updates and learn more at:<br>
             <a href='https://github.com/xorhex/BinYars'>https://github.com/xorhex/BinYars</a></p>
