@@ -88,7 +88,13 @@ def get_os_alt():
 def get_original_file_id(bv: BinaryView):
     if bv.file is not None:
         if bv.file.database is not None:
-            return bv.file.database.read_global("project_binary_id").strip('"')
+            key = "project_binary_id"
+            if key in bv.file.database.global_keys:
+                return bv.file.database.read_global(key).strip('"')
+            else:
+                logger.log_debug(
+                    f"{key} not found among global keys; this is expected when bndb is not in a project"
+                )
         else:
             return "".join(bv.file.filename.split("/")[-2:])
 
@@ -1343,7 +1349,7 @@ class QScanResultsHitSection(QWidget):
                 thread.signals.finished.connect(self.on_scan_finished)
                 thread.start()
         else:
-            logger.log_error("Binary View not set so can't scan")
+            logger.log_error("Binary View not set, can't scan")
 
     def compile_rescan_action(self):
         logger.log_debug("Compile + Scan clicked")
