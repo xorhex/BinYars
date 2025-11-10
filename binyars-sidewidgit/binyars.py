@@ -92,9 +92,13 @@ def get_original_file_id(bv: BinaryView):
             if key in bv.file.database.global_keys:
                 return bv.file.database.read_global(key).strip('"')
             else:
-                logger.log_debug(
-                    f"{key} not found among global keys; this is expected when bndb is not in a project"
-                )
+                key = "filename"
+                if key in bv.file.database.global_keys:
+                    return bv.file.database.read_global(key).strip('"')
+                else:
+                    logger.log_debug(
+                        f"{key} not found among global keys; this is expected when bndb is not in a project"
+                    )
         else:
             return "".join(bv.file.filename.split("/")[-2:])
 
@@ -1263,6 +1267,7 @@ class QScanResultsHitSection(QWidget):
                 f"Not reloading data - Item Set: {set(items) != set(current_items)} Force: {force}  Temp Results: {temp_data_only}"
             )
         # Capture state information
+        global state
         state.update(get_original_file_id(self.bv), temp_data_only)
 
         return True if self.data else False
