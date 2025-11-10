@@ -4,13 +4,9 @@
 
 BinYars is a Binary Ninja Plugin which intergrates YARA-X into Binary Ninja - 2 of my favorate tools.
 
-
-
 ## Manual Installation
 
 This plugin comes in 2 parts.
-
-
 
 ### Rust Component
 
@@ -40,8 +36,6 @@ Requires: rustup, Xcode
 - In the root of the checked out repo, run `cargo build --release`
 - Copy (or bettter yet symlink) the `libbinyars.dylib` into the Binary Ninja plugin dir.  On MacOS this is under: `~/Library/Application\ Support/Binary\ Ninja/plugins`
 
-
-
 ### Python Component
 
 This component contains the UI for the Sidebar Widget as it's easier to write Qt Widgets in Python versus Rust (didn't even try).  It will make calls to the Rust component to do scanning and other YARA-X things.
@@ -49,8 +43,6 @@ This component contains the UI for the Sidebar Widget as it's easier to write Qt
 Steps:
 
 - Copy the folder (or better yet symlink) `binyars-sidewidgit` to the Binary Ninja plugin dir.
-
-
 
 ## Post Installation
 
@@ -86,7 +78,6 @@ These are all found in the right click menu in the project view.
   
   - [BinYarsScanSort.webm](https://github.com/user-attachments/assets/f2706e3e-6ed2-4a3b-be7f-75ee3be4b013)
 
-
 - Scanning Sage (Scan Only)
   
   - Runs all of the compiled rules against all of the files in the project. The results are avaliable in the description and can be viewed at the file level using the BinYars sidebar widget.
@@ -104,12 +95,16 @@ These are all found in the right click menu in the project view.
 - Sidebar Widget (defaults to the right side)
   
   - [binyars_sidebarwidget.webm](https://github.com/user-attachments/assets/5627adb1-fd4e-4108-833e-4955d0399585)
-
+  
   - View scan results
   
   - - ![](./pictures/BinYarsScanResultsSideWidget%20(Markup).png)
     
     - Can click through the string matches to where they are found in the binary
+      
+      - This behavior simply calls `bv.get_address_for_data_offset`; so to ensure this feature works as expected, test using this snippet in the integrated Python console.
+      
+      - Also, sometimes the Binary View must be in linear view for this to work.
   
   - Scan the file
     
@@ -119,13 +114,13 @@ These are all found in the right click menu in the project view.
     
     - Comes with a crude, but mostly functioning editor.
     
-    - 
-    
     - ![](./pictures/BinYarsRuleEditor%20(Markup).png)
     
     - ![](.//pictures/RuleEditorScanResultsShowing.png)
-
-![](./pictures/yara-dir.png)
+  
+  - Other
+    
+    - ![](./pictures/yara-dir.png)
 
 ## Yara-X Rules
 
@@ -135,19 +130,13 @@ BinYars uses 3 Meta fields.
 
 **Note**: All field names are case insensitive.
 
-
-
 #### BNFolder
 
 This is the folder name to assign all of the matches to in Binary Ninja's Project View
 
-
-
 #### Description
 
 The rule description to render inside of Binary Ninja.  
-
-
 
 #### BNSettings
 
@@ -168,8 +157,6 @@ Think of `sr` as short for String Rendering.
 Multiple string rendering can be disabled using this, just seperate each setting with a `|` inside the `bnsettings` meta field.
 
 `BNSettings = "!sr:<$string_name>|!sr:<$string_name>"`
-
-
 
 ### Console Module
 
@@ -235,8 +222,6 @@ rule this_rule_has_been_taken {
     - Brew (Compile)
     
     - Compile Rules
-
-
 
 ## Disclaimers
 
