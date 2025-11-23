@@ -35,8 +35,10 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QStyle,
     QSpacerItem,
+    QAbstractScrollArea,
 )
 from PySide6.QtGui import QImage, QPainter, QColor, QFontMetrics, QPen, QPixmap, QIcon
+
 
 from binaryninja.log import Logger
 from binaryninja import BinaryView, Settings
@@ -252,16 +254,38 @@ class LabeledStatus(QWidget):
 
 
 class ConsoleLogWidget(QWidget):
-    def __init__(self, groupby: str, entries: list[ConsoleEntry], parent=None):
+    def __init__(
+        self, console_entry_group: ConsoleEntryGroup, bv: BinaryView, parent=None
+    ):
         super().__init__(parent)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
 
         # Name
-        layout.addWidget(QLabel(f"Group: {groupby}"))
-        for entry in entries:
+        layout.addWidget(QLabel(f"Group: {console_entry_group.group}"))
+        for entry in console_entry_group.entries:
             layout.addWidget(QLabel(f"  {entry.child}: {entry.value}"))
+
+        if bv:
+            if data := console_entry_group.get_bytes(bv):
+                data_layout = QHBoxLayout()
+                data_layout.addWidget(QLabel("  Data:"))
+                data_value = AutoResizingTextEdit()
+                data_value.setText(" ".join(f"{x:02X}" for x in data))
+                data_value.setReadOnly(True)
+                data_layout.addWidget(data_value, 1)
+                layout.addLayout(data_layout)
+
+            if str_data := console_entry_group.get_bytes_as_string(bv):
+                str_data_layout = QHBoxLayout()
+                str_data_layout.addWidget(QLabel("  As String:"))
+                str_data_value = AutoResizingTextEdit()
+                str_data_value.setText(str_data)
+                str_data_value.setReadOnly(True)
+                str_data_layout.addWidget(str_data_value, 1)
+                layout.addLayout(str_data_layout)
+
         layout.addLayout(layout)
 
         self.setLayout(layout)
@@ -304,6 +328,17 @@ class IdentifierWidget(QWidget):
         data_value.setReadOnly(True)
         data_layout.addWidget(data_value, 1)
         layout.addLayout(data_layout)
+
+        # Data As String
+        if all(b >= 0x20 and b <= 0x7E for b in identifier.data):
+            if dstr := "".join(chr(x) for x in identifier.data):
+                str_data_layout = QHBoxLayout()
+                str_data_layout.addWidget(QLabel("As String:"))
+                str_data_value = AutoResizingTextEdit()
+                str_data_value.setText(dstr)
+                str_data_value.setReadOnly(True)
+                str_data_layout.addWidget(str_data_value, 1)
+                layout.addLayout(str_data_layout)
 
         self.setLayout(layout)
 
@@ -479,26 +514,12 @@ class AutoResizingTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super(AutoResizingTextEdit, self).__init__(parent)
 
-        # This seems to have no effect.
-        # I have expected that it will cause self.hasHeightForWidth()
-        # to start returning True, but it hasn't - that's why I hardcoded
-        # it to True there anyway.
-        # I still set it to True in size policy just in case - for consistency.
         size_policy = self.sizePolicy()
         size_policy.setHeightForWidth(True)
         size_policy.setVerticalPolicy(QSizePolicy.Preferred)
         self.setSizePolicy(size_policy)
 
         self.textChanged.connect(lambda: self.updateGeometry())
-
-    def setMinimumLines(self, num_lines):
-        """Sets minimum widget height to a value
-        corresponding to specified number of lines
-        in the default font."""
-
-        self.setMinimumSize(
-            self.minimumSize().width(), self.lineCountToWidgetHeight(num_lines)
-        )
 
     def hasHeightForWidth(self):
         return True
@@ -509,25 +530,8 @@ class AutoResizingTextEdit(QTextEdit):
         if width >= margins.left() + margins.right():
             document_width = width - margins.left() - margins.right()
         else:
-            # If specified width can't even fit the margin,
-            # there's no space left for the document
             document_width = 0
 
-        # Cloning the whole document only to check its size at
-        # different width seems wasteful
-        # but apparently it's the only and preferred way to do
-        # this in Qt >= 4. QTextDocument does not
-        # provide any means to get height for specified width
-        # (as some QWidget subclasses do).
-        # Neither does QTextEdit. In Qt3 Q3TextEdit had working
-        # implementation of heightForWidth()
-        # but it was allegedly just a hack and was removed.
-        #
-        # The performance probably won't be a problem here
-        # because the application is meant to
-        # work with a lot of small notes rather than few
-        # big ones. And there's usually only one
-        # editor that needs to be dynamically resized - the one having focus.
         document = self.document().clone()
         document.setTextWidth(document_width)
 
@@ -536,29 +540,6 @@ class AutoResizingTextEdit(QTextEdit):
     def sizeHint(self):
         original_hint = super(AutoResizingTextEdit, self).sizeHint()
         return QSize(original_hint.width(), self.heightForWidth(original_hint.width()))
-
-    def lineCountToWidgetHeight(self, num_lines):
-        """Returns the number of pixels corresponding to the height
-        of specified number of lines
-        in the default font."""
-
-        # ASSUMPTION: The document uses only the default font
-
-        assert num_lines >= 0
-
-        widget_margins = self.contentsMargins()
-        document_margin = self.document().documentMargin()
-        font_metrics = QFontMetrics(self.document().defaultFont())
-
-        # font_metrics.lineSpacing() is ignored because it
-        # seems to be already included in font_metrics.height()
-        return (
-            widget_margins.top()
-            + document_margin
-            + max(num_lines, 1) * font_metrics.height()
-            + self.document().documentMargin()
-            + widget_margins.bottom()
-        )
 
 
 class ScanResults:
@@ -1033,8 +1014,8 @@ class QScanResultSelectedSection(QWidget):
         for idx, group in enumerate(console_groups):
             item = QListWidgetItem(self.master_list_widget)
             widget = ConsoleLogWidget(
-                groupby=group.group,
-                entries=group.entries,
+                console_entry_group=group,
+                bv=self.bv,
                 parent=self.master_list_widget,
             )
             item.setSizeHint(widget.sizeHint())
