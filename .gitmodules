@@ -1,0 +1,3 @@
+[submodule "BinYars-SideWidget"]
+	path = BinYars-SideWidget
+	url = git@github.com:xorhex/BinYars-SideWidget.git
