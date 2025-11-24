@@ -46,7 +46,7 @@ This component contains the UI for the Sidebar Widget as it's easier to write Qt
 
 Steps:
 
-- Copy the folder (or better yet symlink) `BinYars-SideWidgit` to the Binary Ninja plugin dir.
+- Copy the folder (or better yet symlink) `BinYars-SideWidget` to the Binary Ninja plugin dir.
 
 ## Post Installation
 
