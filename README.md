@@ -4,6 +4,10 @@
 
 BinYars is a Binary Ninja Plugin which intergrates YARA-X into Binary Ninja - 2 of my favorate tools.
 
+## Installation
+
+Use BinaryNinja's plugin manager.
+
 ## Manual Installation
 
 This plugin comes in 2 parts.
@@ -42,7 +46,7 @@ This component contains the UI for the Sidebar Widget as it's easier to write Qt
 
 Steps:
 
-- Copy the folder (or better yet symlink) `binyars-sidewidgit` to the Binary Ninja plugin dir.
+- Copy the folder (or better yet symlink) `BinYars-SideWidgit` to the Binary Ninja plugin dir.
 
 ## Post Installation
 
