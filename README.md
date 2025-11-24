@@ -10,6 +10,10 @@ Use BinaryNinja's plugin manager.
 
 ## Manual Installation
 
+`git clone --recurse-submodules git@github.com:xorhex/BinYars.git`
+
+
+
 This plugin comes in 2 parts.
 
 ### Rust Component
