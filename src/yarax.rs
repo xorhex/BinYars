@@ -473,18 +473,12 @@ fn has_yara_extension(path: &Path) -> bool {
     }
 }
 
-/// Parses a specially formatted console log message into a JSON-like map.
-///
-/// Expected format:
-/// ```text
-/// BN|key:value|key2:value2|...
-/// ```
-///
 pub fn parse_console_log_message(msg: String) -> Result<HashMap<String, String>> {
     let trimmed = msg.trim();
 
     // Must start with "TB|"
     if !trimmed.starts_with("BN|") {
+        log::info!("Console Message: {}", trimmed);
         return Err(anyhow!("Message does not start with 'BN|'"));
     }
 

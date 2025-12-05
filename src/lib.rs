@@ -294,38 +294,6 @@ impl ProjectCommand for SortCommand {
     }
 }
 
-/// Scans all files in a Binary Ninja project using YARA rules from the specified folder.
-///
-/// This function performs the following steps:
-/// 1. Loads serialized YARA rules from the given `rule_folder`.
-/// 2. Iterates over all files in the `proj` that are not databases.
-/// 3. Scans each file in parallel for matches against the loaded YARA rules.
-/// 4. Updates the progress text on the provided `task` for UI feedback.
-/// 5. Handles cancellation gracefully by stopping ongoing scans.
-///
-/// # Parameters
-/// - `task`: Reference to a `BackgroundTask` used for updating progress and checking cancellation.
-/// - `proj`: Reference to the `Project` containing files to be scanned.
-/// - `rule_folder`: Path to the folder containing serialized YARA rules.
-///
-/// # Returns
-/// - A `Vec<FileHits>` containing all successful scan results for the project files.
-/// - Returns an empty vector if the project is not open, if rules fail to load, or if all files fail scanning.
-///
-/// # Behavior
-/// - Skips files that are considered databases (via `is_database` check).
-/// - Logs progress for each file scanned, including scan errors and cancellations.
-/// - Scans are performed in parallel for efficiency using `par_iter`.
-/// - Progress percentage is calculated and updated based on the number of files processed.
-///
-/// # Example
-/// ```no_run
-/// let task = BackgroundTask::new();
-/// let proj = Project::open("my_project.bndb");
-/// let rule_folder = "yara_rules";
-/// let hits = scan_project(&task, &proj, rule_folder);
-/// println!("Found {} files with matches", hits.len());
-/// ```
 fn scan_project(task: &BackgroundTask, proj: &Project, rule_folder: &str) -> Vec<FileHits> {
     let rules = Rules::new(PLUGIN_RULES_SERIALIZED_FILE, &rule_folder.to_string());
 
@@ -394,40 +362,6 @@ fn scan_project(task: &BackgroundTask, proj: &Project, rule_folder: &str) -> Vec
     results
 }
 
-/// Sorts project files according to YARA rule folder names and updates the Binary Ninja project structure.
-///
-/// This function performs several steps to organize files within a project based on YARA rules:
-/// 1. Scans the project for files matching the specified `rule_folder`.
-/// 2. Builds and moves files into Binary Ninja Database (BNDB) folders according to rule metadata.
-/// 3. Moves unmatched files to the project root directory.
-/// 4. Moves BNDB files to their corresponding binary file locations.
-/// 5. Optionally removes empty folders if `remove_empty_folders_setting` is true.
-/// 6. Stores the results in the project's metadata.
-///
-/// At multiple points, the function checks if the `task` has been cancelled and will exit early if so.
-///
-/// # Parameters
-/// - `task`: Reference to a `BackgroundTask` used for reporting progress and checking for cancellation.
-/// - `proj`: Reference to the `Project` that contains the files to be sorted.
-/// - `rule_folder`: Path to the folder containing YARA rules to guide file organization.
-/// - `remove_empty_folders_setting`: If `true`, empty folders will be removed after sorting.
-///
-/// # Returns
-/// - `Ok(())` if the sorting and metadata update completes successfully or the task is cancelled.
-/// - Returns an `anyhow::Result::Err` only if any underlying operations fail.
-///
-/// # Behavior
-/// - Updates progress text at each major step for UI feedback.
-/// - Handles task cancellation gracefully by exiting early at multiple checkpoints.
-/// - Logs informative messages for each operation, including task cancellation, folder removal, and completion.
-///
-/// # Example
-/// ```no_run
-/// let task = BackgroundTask::new();
-/// let proj = Project::open("my_project.bndb");
-/// let rule_folder = "yara_rules";
-/// sort_by_rule_folder_name(&task, &proj, rule_folder, true).unwrap();
-/// ```
 fn sort_by_rule_folder_name(
     task: &BackgroundTask,
     proj: &Project,
@@ -495,85 +429,6 @@ fn sort_by_rule_folder_name(
     Ok(())
 }
 
-/// Organizes project files into folders based on pattern-matched results.
-///
-/// This function walks through each [`FileHits`] entry and determines the
-/// correct folder hierarchy inside the project to place the corresponding file.
-/// Folder creation and movement are driven by the structure of the matched
-/// rules and metadata extracted from the analysis.
-///
-/// # Arguments
-///
-/// * `task` — A reference to the current [`BackgroundTask`] for reporting
-///   progress updates during folder mapping and movement.
-/// * `proj` — Reference to the active [`Project`] instance that manages files
-///   and folders.
-/// * `hits` — A list of [`FileHits`] objects, each representing metadata and
-///   folder associations for a single file (e.g., parsed from rule matches).
-///
-/// # Behavior
-///
-/// 1. For each file hit:
-///    - Builds a hierarchical folder path using the rule-derived folder structure.
-///    - Uses [`count_folders`] and [`build_path_get_next_folder`] to determine
-///      the most likely subfolder placement at each step.
-///    - Stops when all possible folder levels for that hit are resolved or
-///      when loops are detected.
-/// 2. Calls [`create_project_folder_path`] to ensure all folders exist in the
-///    project, creating missing ones if necessary.
-/// 3. Moves the file into the resolved folder path using [`File::set_folder`].
-/// 4. Updates the file’s description, removing any old BinYar result block and
-///    appending the latest match description.
-/// 5. Reports progress through the background task system.
-///
-/// # Logging
-///
-/// | Level | Purpose |
-/// |--------|----------|
-/// | `info` | High-level file movement and folder creation progress. |
-/// | `debug` | Detailed per-file folder path decisions and hierarchy tracing. |
-/// | `error` | When a file or folder cannot be found or moved. |
-///
-/// # Progress
-///
-/// The function calculates a completion percentage based on how many
-/// [`FileHits`] have been processed and updates `task.set_progress_text()`
-/// accordingly.
-///
-/// # Example
-///
-/// ```rust
-/// move_files_into_folders(&task, &proj, &hits);
-/// // Logs and progress updates will show folder creation and file movement.
-/// ```
-///
-/// # Related Functions
-///
-/// - [`create_project_folder_path`]: Creates missing folders for a given path.
-/// - [`strip_binyar_block`]: Removes previous analysis result sections.
-/// - [`contains_string`]: Detects if a file’s description already includes the
-///   same rule output.
-///
-/// # Errors
-///
-/// This function logs errors but does not return them.  
-/// - Missing files or folders are logged and skipped.  
-/// - Folder creation or movement failures do not stop processing of other files.
-///
-/// # Notes
-///
-/// - BNDB (Binary Ninja Database) files are **not** processed here — they are
-///   handled separately by [`move_bndb_files_to_binary_file_location`].
-/// - Recursive folder path resolution ensures proper nesting but includes
-///   loop detection to prevent infinite recursion.
-///
-/// # See Also
-///
-/// - [`BackgroundTask`]
-/// - [`Project`]
-/// - [`FileHits`]
-/// - [`create_project_folder_path`]
-/// - [`strip_binyar_block`]
 fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHits]) {
     log::info!("Mapping Files to Project Folders");
     let total = hits.len();
@@ -650,56 +505,6 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
     });
 }
 
-/// Saves rule metadata results into the Binary Ninja project metadata store.
-///
-/// This function serializes a mapping of rule results into JSON and writes
-/// it to the project's metadata under the plugin’s namespace (`PLUGIN_NAME`).
-/// This allows later retrieval of analysis results or rule-based metadata.
-///
-/// # Arguments
-///
-/// * `proj` — Reference to the current [`Project`] where the metadata will be stored.  
-/// * `meta_results` — A [`HashMap`] mapping from a string key (such as a file ID
-///   or rule name) to a list of [`MetaRule`] objects representing the results
-///   of the rule evaluation or analysis.
-///
-/// # Behavior
-///
-/// 1. Converts the `meta_results` structure into a JSON string using
-///    [`serde_json::to_string`].  
-/// 2. Wraps the JSON string in a [`Metadata`] object (`Ref<Metadata>`).  
-/// 3. Stores the metadata in the project using [`Project::store_metadata`].  
-///
-/// If serialization fails, the function logs an error and does **not** modify
-/// the project metadata.
-///
-/// # Logging
-///
-/// - `info`: Not used directly here, but other components may rely on the
-///   metadata being updated.  
-/// - `error`: Logged if JSON serialization fails, including the reason returned
-///   by `serde_json`.
-///
-/// # Errors
-///
-/// This function will log but silently continue on serialization failure.
-/// The project state remains unchanged in that case.
-///
-/// # Example
-///
-/// ```rust
-/// let mut meta_results = HashMap::new();
-/// meta_results.insert("file_123".to_string(), vec![MetaRule::new("ExampleRule", "Matched")]);
-///
-/// save_results_to_project_metadata(&proj, meta_results);
-/// // The serialized results are now stored under PLUGIN_NAME in project metadata.
-/// ```
-///
-/// # See Also
-///
-/// - [`Project::store_metadata`]
-/// - [`serde_json`]
-/// - [`MetaRule`]
 fn save_results_to_project_metadata(proj: &Project, meta_results: HashMap<String, Vec<MetaRule>>) {
     match serde_json::to_string(&meta_results) {
         Ok(rh) => {
@@ -713,65 +518,6 @@ fn save_results_to_project_metadata(proj: &Project, meta_results: HashMap<String
     }
 }
 
-/// Removes all **empty folders** from a Binary Ninja project.
-///
-/// This function scans the project for folders that contain:
-/// - **no files**, and  
-/// - **no subfolders**  
-///
-/// It then deletes each such folder, updating task progress as it proceeds.
-///
-/// Internally, it uses [`delete_folder_walk`] to recursively delete
-/// any empty parent folders as well.
-///
-/// # Arguments
-///
-/// * `task` — A [`BackgroundTask`] used to report progress back to the Binary Ninja UI.  
-/// * `proj` — Reference to the current [`Project`].
-///
-/// # Behavior
-///
-/// 1. Iterates over all folders in the project.
-/// 2. Filters out those that contain **no files** and **no subfolders**.
-/// 3. Deletes each folder using [`delete_folder_walk`], which also
-///    recursively removes any empty parent folders.
-/// 4. Tracks progress using an atomic counter and updates the
-///    task’s progress text with a completion percentage.
-///
-/// # Logging
-///
-/// - **Info:** Logs the start of deletion and each folder being processed.
-/// - **Debug:** Can show detailed folder paths (depending on log configuration).
-///
-/// # Concurrency
-///
-/// - Thread-safe: uses [`Arc`] and [`AtomicUsize`] to safely track
-///   progress across concurrent operations if extended in the future.
-/// - Currently processes folders sequentially in a `for_each` loop.
-///
-/// # Example
-///
-/// ```rust
-/// remove_empty_folders(&task, &proj);
-/// // Deletes all empty folders and updates progress in Binary Ninja UI.
-/// ```
-///
-/// # Related
-///
-/// - [`delete_folder_walk`]
-/// - [`is_project_folder_empty_of_files`]
-/// - [`is_project_folder_empty_of_folders`]
-///
-/// # Notes
-///
-/// - Safe to call multiple times — already-removed folders are simply ignored.
-/// - Excludes any folder that contains files or nested subfolders.
-/// - Progress is shown as percentage of folders processed, not actual
-///   deletion count.
-///
-/// # See Also
-///
-/// [`Project::folders`], [`Project::delete_folder`]
 fn remove_empty_folders(task: &BackgroundTask, proj: &Project) {
     let folder_ids: Vec<String> = proj
         .folders()
@@ -807,54 +553,6 @@ fn remove_empty_folders(task: &BackgroundTask, proj: &Project) {
     });
 }
 
-/// Recursively deletes **empty folders** from a Binary Ninja project.
-///
-/// This function walks upward through the project’s folder hierarchy,
-/// deleting the specified folder (and its ancestors) if they contain
-/// **no files** and **no subfolders**.
-///
-/// The walk continues until it encounters a parent folder that is not empty,
-/// or the root of the project is reached.
-///
-/// # Arguments
-///
-/// * `proj` — Reference to the current [`Project`].
-/// * `folder_id` — The ID of the folder to check and potentially delete.
-///
-/// # Behavior
-///
-/// 1. Checks if the folder with `folder_id` exists in the project.
-/// 2. If it exists:
-///     - Verifies the folder is empty of files using [`is_project_folder_empty_of_files`].
-///     - Verifies it is empty of subfolders using [`is_project_folder_empty_of_folders`].
-/// 3. If both conditions hold true, deletes the folder via [`Project::delete_folder`].
-/// 4. Recursively calls itself on the **parent folder**, continuing cleanup upward.
-/// 5. Logs all operations for traceability.
-///
-/// # Logging
-///
-/// - **Info:** When a folder is successfully deleted.
-/// - **Error:** When deletion fails.
-/// - **None:** For skipped non-empty folders.
-///
-/// # Example
-///
-/// ```rust
-/// delete_folder_walk(&proj, "folder_123");
-/// // Deletes `folder_123` and any empty parent folders.
-/// ```
-///
-/// # Notes
-///
-/// - This is a **safe recursive cleanup** function.
-/// - Does **not** attempt to delete folders containing any files or subfolders.
-/// - Safe to call repeatedly; once folders are gone, further calls simply no-op.
-///
-/// # Related
-///
-/// - [`is_project_folder_empty_of_files`]
-/// - [`is_project_folder_empty_of_folders`]
-/// - [`Project::delete_folder`]
 fn delete_folder_walk(proj: &Project, folder_id: &str) {
     if let Some(folder) = proj.folder_by_id(folder_id) {
         if is_project_folder_empty_of_files(proj, folder_id)
@@ -872,50 +570,6 @@ fn delete_folder_walk(proj: &Project, folder_id: &str) {
     }
 }
 
-/// Moves all project files that have **no corresponding scan results**
-/// (i.e., files not appearing in any [`FileHits`]) to the **root directory**
-/// of the project.
-///
-/// This function helps clean up project folder structures after a YARA scan
-/// by ensuring that only files with matched rules remain in subfolders,
-/// while unmatched files are relocated to the root.
-///
-/// # Arguments
-///
-/// * `proj` — A reference to the current [`Project`] being organized.
-/// * `hits` — A slice of [`FileHits`] containing scan results for files.
-///
-/// # Behavior
-///
-/// 1. Builds a `HashSet` of all file IDs that have associated YARA hits
-///    **and** contain at least one non-empty Binary Ninja folder path (sort).
-/// 2. Iterates through every file in the project.
-/// 3. Skips `.bndb` database files (they’re handled separately).
-/// 4. Moves unmatched files (not in `hit_ids`) to the project root.
-/// 5. Logs each move operation for traceability.
-///
-/// # Logging
-///
-/// - **Info:** When moving an unmatched file or starting the process.
-/// - **Debug:** Can be added if needed for inspecting hit ID sets.
-/// - **Error:** None are expected; failures are silently ignored.
-///
-/// # Example
-///
-/// ```rust
-/// move_unmatched_file_to_root_dir(&proj, &scan_results);
-/// // Moves all files without hits to the root folder.
-/// ```
-///
-/// # Notes
-///
-/// - The helper function [`is_database`] should detect BNDB files.
-/// - [`FileHits::sort`] returns true if there are any folders the
-///   file to be moved to
-///
-/// # Related
-///
-/// - [`move_bndb_files_to_binary_file_location`] handles `.bndb` file placement.
 fn move_unmatched_file_to_root_dir(proj: &Project, hits: &[FileHits]) {
     // Collect all file_ids that appear in FileHits
     let hit_ids: std::collections::HashSet<_> = hits
@@ -942,50 +596,6 @@ fn move_unmatched_file_to_root_dir(proj: &Project, hits: &[FileHits]) {
     }
 }
 
-/// Moves Binary Ninja database (`.bndb`) files in a project so that each one
-/// is located in the same folder as its corresponding original binary file.
-///
-/// This function searches the project for all `.bndb` files, determines
-/// the binary file each one was created from, and ensures that both files
-/// share the same project folder. If the BNDB file is not in the same
-/// folder, it is automatically moved there.
-///
-/// # Arguments
-///
-/// * `proj` — A reference to the current [`Project`] containing files and folders.
-///
-/// # Behavior
-///
-/// - Logs each discovered `.bndb` file.
-/// - Attempts to read the BNDB file on disk to determine the original binary’s project ID.
-/// - Compares the BNDB file’s folder with that of the corresponding binary.
-/// - Moves the BNDB file into the binary’s folder if they differ.
-/// - Emits detailed log messages for successes and errors.
-///
-/// # Logging
-///
-/// - **Info:** When a BNDB file is found or successfully moved.
-/// - **Debug:** When full paths or IDs are discovered during matching.
-/// - **Error:** When a file or path cannot be resolved.
-///
-/// # Example
-///
-/// ```rust
-/// move_bndb_files_to_binary_file_location(&proj);
-/// // Moves all BNDB files to align with their binary files’ locations.
-/// ```
-///
-/// # Errors
-///
-/// This function does not return an error directly.  
-/// Failures (e.g., file not found, missing path, etc.) are logged using `log::error!`.
-///
-/// # Notes
-///
-/// - The function assumes that each `.bndb` file stores metadata containing
-///   the original binary’s project ID.
-/// - It uses helper functions such as [`get_project_bndb_files`] and
-///   [`get_original_file_id`] to identify and match files.
 fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project) {
     log::info!("Moving BNDB files");
 
@@ -1101,54 +711,6 @@ fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project
     });
 }
 
-/// Removes all text blocks between the BinYar rule markers (inclusive) from a given string.
-///
-/// This function searches for text sections that start with:
-/// ```text
-/// ==============================
-/// BinYar Rules
-/// ===========================
-/// ```
-/// and end with:
-/// ```text
-/// End BinYar Rules
-/// ==============================
-/// ```
-///
-/// Everything between (and including) these markers is removed from the string.
-///
-/// # Arguments
-///
-/// * `input` - The input text containing potential BinYar rule sections.
-///
-/// # Returns
-///
-/// A new `String` with all BinYar rule blocks removed and surrounding whitespace trimmed.
-///
-/// # Example
-///
-/// ```rust
-/// let text = r#"
-/// Header text
-/// ==============================
-/// BinYar Rules
-/// ============================
-/// some yara rule content
-/// End BinYar Rules
-/// ==============================
-/// Footer text
-/// "#;
-///
-/// let cleaned = strip_binyar_block(text);
-/// assert!(cleaned.contains("Header text"));
-/// assert!(cleaned.contains("Footer text"));
-/// assert!(!cleaned.contains("BinYar Rules"));
-/// ```
-///
-/// # Notes
-///
-/// - Uses a single-line (`(?s)`) regex flag so that `.` matches newlines.
-/// - Will remove **all** matching rule blocks if multiple exist in the text.
 fn strip_binyar_block(input: &str) -> String {
     // Regex: match the start marker, everything in between, and the end marker
     let re = Regex::new(
@@ -1158,87 +720,10 @@ fn strip_binyar_block(input: &str) -> String {
     re.replace_all(input, "").trim().to_string()
 }
 
-/// Checks whether a given substring (`needle`) exists within another string (`haystack`).
-///
-/// # Arguments
-///
-/// * `haystack` - The string to search within.
-/// * `needle` - The substring to look for inside `haystack`.
-///
-/// # Returns
-///
-/// Returns `true` if `needle` is found anywhere in `haystack`, otherwise `false`.
-///
-/// # Example
-///
-/// ```rust
-/// let text = "Binary Ninja is powerful";
-/// assert!(contains_string(text, "Ninja"));
-/// assert!(!contains_string(text, "Yara"));
-/// ```
-///
-/// # Notes
-///
-/// This function performs a simple substring search using [`str::contains`],
-/// which is case-sensitive and works efficiently for short text checks.
 fn contains_string(haystack: &str, needle: &str) -> bool {
     haystack.contains(needle)
 }
 
-/// Ensures that a project folder path exists for a given file and updates folder descriptions based on metadata.
-///
-/// # Arguments
-///
-/// * `file_hits` - A [`FileHits`] reference containing metadata (`MetaRule`s) for the scanned file.
-/// * `proj` - Reference to the active [`Project`] where folders are managed.
-/// * `path` - A list (`Vec<String>`) representing the folder hierarchy to create or verify, in order (e.g., `["src", "yara", "rules"]`).
-/// * `file_id` - The unique identifier of the file being processed.
-///
-/// # Returns
-///
-/// Returns the final folder ID (`String`) corresponding to the deepest folder in the constructed path.
-///
-/// # Behavior
-///
-/// This function walks through the provided `path` segments and ensures that each folder exists in the project:
-///
-/// 1. For each folder name:
-///    - If the folder already exists under the current parent, it uses that folder’s ID.
-///    - If it does not exist, it creates the folder using [`Project::create_folder`].
-///
-/// 2. After creating or retrieving a folder, it checks `file_hits.hits` for any [`MetaRule`]s whose `folder`
-///    matches the current folder name:
-///    - If the `MetaRule` has a non-empty description and it’s not already in the folder’s description,
-///      it appends it (separated by a newline).
-///
-/// 3. Logs progress and updates using `log::debug!` and `log::error!`.
-///
-/// 4. At the end, reconstructs and logs the full reverse path using [`walk_folder_path`].
-///
-/// # Example
-///
-/// ```rust
-/// let path = vec!["src".to_string(), "rules".to_string()];
-/// let folder_id = create_project_folder_path(&file_hits, &project, path, "file_123");
-/// println!("Final folder ID: {}", folder_id);
-/// ```
-///
-/// # Side Effects
-///
-/// - Creates missing folders within the project hierarchy.
-/// - Updates folder descriptions when `MetaRule` descriptions are available.
-/// - Logs debug and error messages.
-///
-/// # Errors
-///
-/// - Fails gracefully if folder creation fails (logs error but continues).
-/// - Skips description updates for missing folders.
-///
-/// # Notes
-///
-/// - This function assumes `Project::create_folder` and `folder_by_id` are thread-safe or used in a single-threaded context.
-/// - Empty folder names in the path are ignored.
-/// - Descriptions are appended only if not already present to prevent duplication.
 fn create_project_folder_path<'a>(
     file_hits: &FileHits,
     proj: &Project,
@@ -1286,46 +771,6 @@ fn create_project_folder_path<'a>(
     pid
 }
 
-/// Retrieves the ID of a project folder that matches a given name and parent folder ID.
-///
-/// # Arguments
-///
-/// * `proj` - Reference to the current [`Project`] containing folders.
-/// * `name` - The name of the folder to search for.
-/// * `parent_id` - The ID of the expected parent folder.  
-///   - If this is an empty string, the function searches for folders without a parent (root-level).
-///
-/// # Returns
-///
-/// Returns `Some(String)` containing the matching folder’s ID if found,  
-/// or `None` if no folder matches both the name and parent ID.
-///
-/// # Behavior
-///
-/// The function iterates over all folders in the project and finds the first one that:
-/// - Has the specified `name`, and  
-/// - Has a parent folder whose ID matches `parent_id`, or no parent if `parent_id` is empty.
-///
-/// If no match is found, a debug log entry is recorded.
-///
-/// # Example
-///
-/// ```rust
-/// if let Some(folder_id) = get_project_folder_id(&project, "src", "root_id") {
-///     println!("Found folder ID: {}", folder_id);
-/// } else {
-///     println!("Folder not found");
-/// }
-/// ```
-///
-/// # Logging
-///
-/// Logs a debug message if no matching folder is found.
-///
-/// # Notes
-///
-/// - This function assumes folder names are not unique across different parent folders.
-/// - Use both name and parent ID together for disambiguation.
 fn get_project_folder_id(proj: &Project, name: &str, parent_id: &str) -> Option<String> {
     let result = proj
         .folders()
@@ -1348,39 +793,6 @@ fn get_project_folder_id(proj: &Project, name: &str, parent_id: &str) -> Option<
     result
 }
 
-/// Recursively walks up the folder hierarchy of a project to build the full path
-/// from a given folder ID to the root.
-///
-/// # Arguments
-///
-/// * `proj` - Reference to the current [`Project`] containing folders.
-/// * `pid` - The folder ID (`String`) to start walking from.
-/// * `path` - A mutable vector used to collect folder names as the path is built.
-///
-/// # Behavior
-///
-/// This function performs a recursive traversal from the specified folder up through
-/// its parent folders until the root is reached. Each folder name encountered is pushed
-/// onto the provided `path` vector.
-///
-/// The resulting `path` will contain folder names in **reverse order** (i.e., from the
-/// starting folder up to the root). You can reverse it afterward or join with a separator
-/// to form a readable folder path.
-///
-/// # Example
-///
-/// ```rust
-/// let mut path = Vec::new();
-/// walk_folder_path(&project, "some_folder_id".to_string(), &mut path);
-/// let full_path = path.iter().rev().cloned().collect::<Vec<_>>().join("/");
-/// println!("Full folder path: {}", full_path);
-/// ```
-///
-/// # Notes
-///
-/// - The function logs the reversed path (joined by "/") when it reaches the root folder.
-/// - If the folder ID does not exist, nothing is added to `path`.
-/// - Used for debugging purposes
 fn walk_folder_path(proj: &Project, pid: String, path: &mut Vec<String>) {
     if let Some(folder) = proj.folder_by_id(&pid) {
         path.push(folder.name());
