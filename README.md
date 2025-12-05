@@ -192,11 +192,14 @@ All console messages are parsed as follows:
       
       - `("BN|rule:my_shellcode_rule|Shellcode.Offset: ", shellcode_offset)`
       
-      - `("BN|rule:my_shellcode_rule|Shellcode.Size: ", shellcode_size)`
+      - `("BN|rule:my_shellcode_rule|Shellcode.Length: ", shellcode_size)`
       
       - Both of these values will be combined into 1 entry in the sidebar widget under Shellcode
   
   - The value name **Offset** is special. When used, it will make the entry in the sidebar widget interactive; so when clicked upon, it will goto that location in the binary.
+
+  - The value name **Length** is also special.  When used in combination with **Offset**, the results displayed will include the bytes from the `offset` to the `offset + length`.
+
 
 **Example Rule**
 
@@ -216,7 +219,7 @@ rule this_rule_has_been_taken {
             offset = uint32(@very_particular_set_of_bytes[#very_particular_set_of_bytes] + 1),
             size = uint16(@very_particular_set_of_bytes[#very_particular_set_of_bytes] + !very_particular_set_of_bytes) : (
                 console.hex("BN|rule:this_rule_has_been_taken|Taken.Offset: ", offset)
-                and console.hex("BN|rule:this_rule_has_been_taken|Taken.Size: ", size)
+                and console.hex("BN|rule:this_rule_has_been_taken|Taken.Length: ", size)
         )
 }
 ```
