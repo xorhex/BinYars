@@ -336,7 +336,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_bytes(rules: yara_x::Rules, bytes: &[u8]) -> String {
+    pub fn scan_bytes(rules: yara_x::Rules, bytes: &[u8], pattern_limit: u64) -> String {
         let mut scanner = yara_x::Scanner::new(&rules);
 
         let logs: Arc<Mutex<Vec<HashMap<String, String>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -370,7 +370,7 @@ impl Scanner {
                                     .as_str(),
                             ),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
-                            get_patterns(h.patterns()),
+                            get_patterns(h.patterns(), pattern_limit),
                         )
                     })
                     .collect::<Vec<MetaRule>>();
@@ -399,9 +399,10 @@ impl Scanner {
         file_path: &str,
         file_name: String,
         file_id: String,
+        pattern_limit: u64,
     ) -> Result<FileHits, BinYarsError> {
         // Perform the scan
-        Scanner::do_scan(&rules, file_path, file_name, file_id)
+        Scanner::do_scan(&rules, file_path, file_name, file_id, pattern_limit)
     }
 
     fn do_scan(
@@ -409,6 +410,7 @@ impl Scanner {
         file_path: &str,
         file_name: String,
         file_id: String,
+        pattern_limit: u64,
     ) -> Result<FileHits, BinYarsError> {
         let mut scanner = yara_x::Scanner::new(arc_rules);
 
@@ -443,7 +445,7 @@ impl Scanner {
                                     .as_str(),
                             ),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
-                            get_patterns(h.patterns()),
+                            get_patterns(h.patterns(), pattern_limit),
                         )
                     })
                     .collect::<Vec<MetaRule>>();
@@ -579,10 +581,16 @@ fn filter_logs_by_rule(
         .collect()
 }
 
-fn get_patterns(patterns: yara_x::Patterns) -> Vec<Pattern> {
+fn get_patterns(patterns: yara_x::Patterns, limit: u64) -> Vec<Pattern> {
     let mut hit_patterns = Vec::new();
-    patterns.into_iter().for_each(|m| {
-        m.matches().for_each(|n| {
+    let mut count = 0;
+
+    for m in patterns {
+        for n in m.matches() {
+            if limit != 0 && count >= limit {
+                return hit_patterns;
+            }
+
             let r = n.range();
             hit_patterns.push(Pattern::new(
                 m.identifier().to_string(),
@@ -590,8 +598,10 @@ fn get_patterns(patterns: yara_x::Patterns) -> Vec<Pattern> {
                 r.end - r.start,
                 format!("{:?}", n.data()),
             ));
-        });
-    });
+
+            count += 1;
+        }
+    }
     hit_patterns
 }
 
@@ -658,6 +668,7 @@ pub unsafe extern "C" fn scan_bytes(
     len: usize,
     folder: *const c_char,
     compiled_rules_file_name: *const c_char,
+    pattern_limit: u64,
 ) -> *const c_char {
     if ptr.is_null() || folder.is_null() || compiled_rules_file_name.is_null() {
         log::error!("A parameter is null\n\n");
@@ -687,7 +698,7 @@ pub unsafe extern "C" fn scan_bytes(
     match rules.load() {
         Ok(yrules) => {
             log::info!("Scanning Bytes\n\n");
-            let results = Scanner::scan_bytes(yrules, slice);
+            let results = Scanner::scan_bytes(yrules, slice, pattern_limit);
             CString::new(results).unwrap().into_raw()
         }
         Err(_) => {
@@ -702,6 +713,7 @@ pub unsafe extern "C" fn scan_rule_against_bytes(
     ptr: *const u8,
     len: usize,
     rule: *const c_char,
+    pattern_limit: u64,
 ) -> *const c_char {
     if ptr.is_null() || rule.is_null() {
         log::error!("A parameter is null\n\n");
@@ -726,7 +738,7 @@ pub unsafe extern "C" fn scan_rule_against_bytes(
         Ok(_) => {
             let built_rules = compiler.build();
             log::info!("Scanning Bytes\n\n");
-            let results = Scanner::scan_bytes(built_rules, slice);
+            let results = Scanner::scan_bytes(built_rules, slice, pattern_limit);
             CString::new(results).unwrap().into_raw()
         }
         Err(e) => {
