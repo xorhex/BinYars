@@ -12,8 +12,6 @@ Use BinaryNinja's plugin manager.
 
 `git clone --recurse-submodules git@github.com:xorhex/BinYars.git`
 
-
-
 This plugin comes in 2 parts.
 
 ### Rust Component
@@ -59,6 +57,10 @@ Set the value for **<u>"Set YARA-X Rules Directory"</u>** to a folder that conta
 ### Settings
 
 ![](./pictures/BinYars-Settings.png)
+
+![](./pictures/binyars_string_capture_limiter.png)
+
+**Yara-X String Var** setting limits the number of string matches captured by the plugin for rendering in the UI. If the number is too high, it can cause BinaryNinja to become sluggish. The number `20` was arbitrarily set; if the string match does not show in the UI, then adjust this number and re-run the scan to re-populate the json results stored in BinaryNinja for rendering.
 
 ## Features
 
@@ -197,9 +199,8 @@ All console messages are parsed as follows:
       - Both of these values will be combined into 1 entry in the sidebar widget under Shellcode
   
   - The value name **Offset** is special. When used, it will make the entry in the sidebar widget interactive; so when clicked upon, it will goto that location in the binary.
-
+  
   - The value name **Length** is also special.  When used in combination with **Offset**, the results displayed will include the bytes from the `offset` to the `offset + length`.
-
 
 **Example Rule**
 
