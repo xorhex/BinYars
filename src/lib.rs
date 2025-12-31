@@ -40,6 +40,7 @@ static PLUGIN_NAME: &str = "BinYars";
 static PLUGIN_SETTING_DIR: &str = "BinYars Settings.Yara-X Directory.dir";
 static PLUGIN_SETTING_EMPTY_DIRY: &str = "BinYars Settings.Oracle of Order.empty_dir";
 static PLUGIN_RULES_SERIALIZED_FILE: &str = "yarax.compiled.bin";
+static PLUGIN_SETTING_STRING_VAR_LIMIT: &str = "BinYars Settings.Yara-X String Var.limit";
 
 custom_error! {pub BinYarsError
     SerdeJsonError{source: serde_json::Error} = "Error ",
@@ -83,6 +84,17 @@ pub extern "C" fn UIPluginInit() -> bool {
     settings.register_setting_json(
         PLUGIN_SETTING_EMPTY_DIRY,
         &remove_empty_project_folders.to_string(),
+    );
+
+    let limit_string_var_matches_returned = json!({
+        "title" : "Set YARA-X String Match Limit",
+        "type" : "number",
+        "default" : 20,
+        "description" : "Restrict YARA-X rule string pattern matching capture to this number (it's per string var in the rule). Set to 0 to capture all of the string pattern matches from the rule. This does not effect the rule, just the json results stored in Binary Ninja. Warning, when set to 0 this can have adverse affects on Binary Ninja's performance.",
+    });
+    settings.register_setting_json(
+        PLUGIN_SETTING_STRING_VAR_LIMIT,
+        &limit_string_var_matches_returned.to_string(),
     );
 
     plugin_init();
@@ -205,6 +217,7 @@ impl ProjectCommand for ScanCommand {
         log::info!("Scanning project: {}", proj.name());
         let project = proj.to_owned();
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+        let pattern_limit = Settings::new().get_integer(PLUGIN_SETTING_STRING_VAR_LIMIT);
 
         if rule_folder.trim().is_empty() {
             log::error!(
@@ -216,7 +229,7 @@ impl ProjectCommand for ScanCommand {
 
         spawn(move || {
             let task = BackgroundTask::new("BinYars start", true);
-            let res = scanonly(&task, &project, &rule_folder);
+            let res = scanonly(&task, &project, &rule_folder, pattern_limit);
             match res {
                 Ok(_) => task.finish(),
                 Err(e) => {
@@ -233,9 +246,14 @@ impl ProjectCommand for ScanCommand {
     }
 }
 
-fn scanonly(task: &BackgroundTask, proj: &Project, rule_folder: &str) -> anyhow::Result<()> {
+fn scanonly(
+    task: &BackgroundTask,
+    proj: &Project,
+    rule_folder: &str,
+    pattern_limit: u64,
+) -> anyhow::Result<()> {
     task.set_progress_text(&format!("{} - Scanning Files Only", PLUGIN_NAME));
-    let hits = scan_project(task, proj, rule_folder);
+    let hits = scan_project(task, proj, rule_folder, pattern_limit);
 
     if task.is_cancelled() {
         log::info!("Task cancelled by user.");
@@ -265,6 +283,7 @@ impl ProjectCommand for SortCommand {
         log::info!("Scanning project: {}", proj.name());
         let project = proj.to_owned();
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
+        let pattern_limit = Settings::new().get_integer(PLUGIN_SETTING_STRING_VAR_LIMIT);
 
         if rule_folder.trim().is_empty() {
             log::error!(
@@ -277,7 +296,13 @@ impl ProjectCommand for SortCommand {
         let remove_empty_folders = Settings::new().get_bool(PLUGIN_SETTING_EMPTY_DIRY);
         spawn(move || {
             let task = BackgroundTask::new("BinYars start", true);
-            let res = sort_by_rule_folder_name(&task, &project, &rule_folder, remove_empty_folders);
+            let res = sort_by_rule_folder_name(
+                &task,
+                &project,
+                &rule_folder,
+                remove_empty_folders,
+                pattern_limit,
+            );
             match res {
                 Ok(_) => task.finish(),
                 Err(e) => {
@@ -294,7 +319,12 @@ impl ProjectCommand for SortCommand {
     }
 }
 
-fn scan_project(task: &BackgroundTask, proj: &Project, rule_folder: &str) -> Vec<FileHits> {
+fn scan_project(
+    task: &BackgroundTask,
+    proj: &Project,
+    rule_folder: &str,
+    pattern_limit: u64,
+) -> Vec<FileHits> {
     let rules = Rules::new(PLUGIN_RULES_SERIALIZED_FILE, &rule_folder.to_string());
 
     if !proj.is_open() {
@@ -339,7 +369,13 @@ fn scan_project(task: &BackgroundTask, proj: &Project, rule_folder: &str) -> Vec
 
             log::info!("   Scanning {}", name);
 
-            let matches = Scanner::scan_file(rules_arc.clone(), path_str, name.clone(), id.clone());
+            let matches = Scanner::scan_file(
+                rules_arc.clone(),
+                path_str,
+                name.clone(),
+                id.clone(),
+                pattern_limit,
+            );
 
             // update progress counter
             let finished = counter.fetch_add(1, Ordering::SeqCst) + 1;
@@ -367,9 +403,10 @@ fn sort_by_rule_folder_name(
     proj: &Project,
     rule_folder: &str,
     remove_empty_folders_setting: bool,
+    pattern_limit: u64,
 ) -> anyhow::Result<()> {
     task.set_progress_text(&format!("{} - Scanning Files", PLUGIN_NAME));
-    let hits = scan_project(task, proj, rule_folder);
+    let hits = scan_project(task, proj, rule_folder, pattern_limit);
 
     if task.is_cancelled() {
         log::info!("Task cancelled by user.");
