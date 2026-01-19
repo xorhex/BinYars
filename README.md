@@ -168,6 +168,30 @@ Multiple string rendering can be disabled using this, just seperate each setting
 
 `BNSettings = "!sr:<$string_name>|!sr:<$string_name>"`
 
+### BNTrigger
+
+A code snippet to run when a match is found. This is still a manual process but it allows for the combination of the captured console module key value pairs (see the section below) with the base64 encoded code snippet to be combined for use.
+
+The format is "|"; for example:
+
+```
+BNTrigger   = "Extract File|ZnJvbSBiaW5hcnluaW5qYSBpbXBvcnQgVHJhbnNmb3JtOyAKaW1wb3J0IGhhc2hsaWI7IAoKc2hhMjU2ID0gaGFzaGxpYi5zaGEyNTYoYnYuZmlsZS5yYXcucmVhZCgwLCBidi5maWxlLnJhdy5sZW5ndGgpKS5oZXhkaWdlc3QoKQoKY3VycmVudF9wcm9qZWN0LmNyZWF0ZV9maWxlKFRyYW5zZm9ybVsnWE9SJ10uZGVjb2RlKGJ2LnJlYWQoT2Zmc2V0LCBTaXplKSwgeydrZXknOiBieXRlcyhbS2V5XSl9KSwgZm9sZGVyPU5vbmUsIG5hbWU9ZiJleHRyYWN0ZWRfZnJvbV97YnYucHJvamVjdF9maWxlLm5hbWUuc3BsaXQoJy4nKVswXX0uYmluIiwgZGVzY3JpcHRpb249ZiJFeHRyYWN0ZWQgZnJvbToge3NoYTI1Nn0iKQ=="
+```
+
+For matching rules where BNTrigger is found, two buttons will show up on the Scan Results tab (below the string and console details):
+
+![](./pictures/BinYars_BNTriggerButtons.png)
+
+The first button says "Copy: ".
+
+The second button will open a module box showing the code snippet along with any console module related variables added to it.
+
+![](./pictures/BinYars_ActionPopUpModule.png)
+
+In the screenshot, the `Key`, `Size`, and `Offset` values are prepended to the code snippet. These values are captured by the YARA-X rule using the console module (when using the special format, `console.hex("BN|rule:<rule name>|<ValueName>: ", <value>)` explained in the Console Module section). Notice how the code snippet makes use of these variables.
+
+Copy the code (either from the `Copy: <Action Name>` button or the module box) and paste it into the python console, execute, and profit!
+
 ### Console Module
 
 The plugin can surface `console.[log|hex]` messages, but the strings must match this format for them to be picked up.
@@ -178,7 +202,7 @@ console.hex("BN|rule:<rule name>|<ValueName>: ", <value>)
 
 All console messages are parsed as follows:
 
-- Must start with `BN|`; will be ignored if not
+- Must start with `BN|`; if not, the console text will be printed to the log instead
 
 - Must have a `rule:<rule name>`entry between a set of `|`
   
