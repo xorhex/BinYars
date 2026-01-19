@@ -7,12 +7,10 @@ use binaryninja::command::{
     register_command, register_command_for_project, Command, ProjectCommand,
 };
 use binaryninja::is_database;
-use binaryninja::logger::Logger;
 use binaryninja::metadata::Metadata;
 use binaryninja::project::Project;
 use binaryninja::rc::Ref;
 use binaryninja::settings::Settings;
-use log::LevelFilter;
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json;
@@ -98,14 +96,12 @@ pub extern "C" fn UIPluginInit() -> bool {
     );
 
     plugin_init();
-    log::info!("{} Rust plugin component loaded!\n", PLUGIN_NAME);
+    tracing::info!("{} Rust plugin component loaded!\n", PLUGIN_NAME);
     true
 }
 
 fn plugin_init() {
-    Logger::new(PLUGIN_NAME)
-        .with_level(LevelFilter::Debug)
-        .init();
+    binaryninja::tracing_init!(PLUGIN_NAME);
 
     register_command(
         &format!("{PLUGIN_NAME}\\Compile Rules"),
@@ -131,7 +127,7 @@ fn plugin_init() {
     );
 
     let yara_x_version = env!("YARA_X_VERSION");
-    log::debug!("Using yara-x version: {}", yara_x_version);
+    tracing::debug!("Using yara-x version: {}", yara_x_version);
 }
 
 /*****************************************************
@@ -145,7 +141,7 @@ impl ProjectCommand for ProjectRuleCompileCommand {
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
 
         if rule_folder.trim().is_empty() {
-            log::error!(
+            tracing::error!(
                 "Rules folder path is empty — check settings for `{}`",
                 PLUGIN_SETTING_DIR
             );
@@ -159,7 +155,7 @@ impl ProjectCommand for ProjectRuleCompileCommand {
             match res {
                 Ok(_) => task.finish(),
                 Err(e) => {
-                    log::error!("Error processing {PLUGIN_NAME} files: {e:?}");
+                    tracing::error!("Error processing {PLUGIN_NAME} files: {e:?}");
                     task.set_progress_text(&format!("{PLUGIN_NAME} Error: {e}"));
                     task.finish();
                 }
@@ -179,7 +175,7 @@ impl Command for RuleCompileCommand {
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
 
         if rule_folder.trim().is_empty() {
-            log::error!(
+            tracing::error!(
                 "Rules folder path is empty — check settings for `{}`",
                 PLUGIN_SETTING_DIR
             );
@@ -193,7 +189,7 @@ impl Command for RuleCompileCommand {
             match res {
                 Ok(_) => task.finish(),
                 Err(e) => {
-                    log::error!("Error processing {PLUGIN_NAME} files: {e:?}");
+                    tracing::error!("Error processing {PLUGIN_NAME} files: {e:?}");
                     task.set_progress_text(&format!("{PLUGIN_NAME} Error: {e}"));
                     task.finish();
                 }
@@ -214,13 +210,13 @@ struct ScanCommand;
 
 impl ProjectCommand for ScanCommand {
     fn action(&self, proj: &Project) {
-        log::info!("Scanning project: {}", proj.name());
+        tracing::info!("Scanning project: {}", proj.name());
         let project = proj.to_owned();
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
         let pattern_limit = Settings::new().get_integer(PLUGIN_SETTING_STRING_VAR_LIMIT);
 
         if rule_folder.trim().is_empty() {
-            log::error!(
+            tracing::error!(
                 "Rules folder path is empty — check settings for `{}`",
                 PLUGIN_SETTING_DIR
             );
@@ -233,7 +229,7 @@ impl ProjectCommand for ScanCommand {
             match res {
                 Ok(_) => task.finish(),
                 Err(e) => {
-                    log::error!("Error processing {PLUGIN_NAME} files: {e:?}");
+                    tracing::error!("Error processing {PLUGIN_NAME} files: {e:?}");
                     task.set_progress_text(&format!("{PLUGIN_NAME} Error: {e}"));
                     task.finish();
                 }
@@ -256,7 +252,7 @@ fn scanonly(
     let hits = scan_project(task, proj, rule_folder, pattern_limit);
 
     if task.is_cancelled() {
-        log::info!("Task cancelled by user.");
+        tracing::info!("Task cancelled by user.");
         return Ok(()); // exit early
     }
 
@@ -268,7 +264,7 @@ fn scanonly(
     let result_meta = get_all_meta_file_rules(&hits);
     save_results_to_project_metadata(proj, result_meta);
 
-    log::info!("BinYars execution complete!");
+    tracing::info!("BinYars execution complete!");
     Ok(())
 }
 
@@ -280,13 +276,13 @@ struct SortCommand;
 
 impl ProjectCommand for SortCommand {
     fn action(&self, proj: &Project) {
-        log::info!("Scanning project: {}", proj.name());
+        tracing::info!("Scanning project: {}", proj.name());
         let project = proj.to_owned();
         let rule_folder = Settings::new().get_string(PLUGIN_SETTING_DIR);
         let pattern_limit = Settings::new().get_integer(PLUGIN_SETTING_STRING_VAR_LIMIT);
 
         if rule_folder.trim().is_empty() {
-            log::error!(
+            tracing::error!(
                 "Rules folder path is empty — check settings for `{}`",
                 PLUGIN_SETTING_DIR
             );
@@ -306,7 +302,7 @@ impl ProjectCommand for SortCommand {
             match res {
                 Ok(_) => task.finish(),
                 Err(e) => {
-                    log::error!("Error processing {PLUGIN_NAME} files: {e:?}");
+                    tracing::error!("Error processing {PLUGIN_NAME} files: {e:?}");
                     task.set_progress_text(&format!("{PLUGIN_NAME} Error: {e}"));
                     task.finish();
                 }
@@ -354,7 +350,7 @@ fn scan_project(
     let rules_arc = match rules.load() {
         Ok(r) => Arc::new(r), // wrap loaded rules in Arc
         Err(e) => {
-            log::error!("Rules not loaded: {}", e);
+            tracing::error!("Rules not loaded: {}", e);
             return Vec::new();
         }
     };
@@ -367,7 +363,7 @@ fn scan_project(
                 return None; // silently stop this worker
             }
 
-            log::info!("   Scanning {}", name);
+            tracing::info!("   Scanning {}", name);
 
             let matches = Scanner::scan_file(
                 rules_arc.clone(),
@@ -386,14 +382,14 @@ fn scan_project(
             match matches {
                 Ok(v) => Some(v),
                 Err(e) => {
-                    log::error!("Skipping {} due to scan error: {}", name, e);
+                    tracing::error!("Skipping {} due to scan error: {}", name, e);
                     None
                 }
             }
         })
         .collect();
 
-    log::info!("Scan complete.");
+    tracing::info!("Scan complete.");
 
     results
 }
@@ -409,7 +405,7 @@ fn sort_by_rule_folder_name(
     let hits = scan_project(task, proj, rule_folder, pattern_limit);
 
     if task.is_cancelled() {
-        log::info!("Task cancelled by user.");
+        tracing::info!("Task cancelled by user.");
         return Ok(()); // exit early
     }
 
@@ -418,7 +414,7 @@ fn sort_by_rule_folder_name(
     move_files_into_folders(task, proj, &hits);
 
     if task.is_cancelled() {
-        log::info!("Task cancelled by user.");
+        tracing::info!("Task cancelled by user.");
         return Ok(()); // exit early
     }
 
@@ -427,7 +423,7 @@ fn sort_by_rule_folder_name(
     move_bndb_files_to_binary_file_location(task, &proj);
 
     if task.is_cancelled() {
-        log::info!("Task cancelled by user.");
+        tracing::info!("Task cancelled by user.");
         return Ok(()); // exit early
     }
 
@@ -437,11 +433,11 @@ fn sort_by_rule_folder_name(
         move_unmatched_file_to_root_dir(&proj, &hits);
 
         if task.is_cancelled() {
-            log::info!("Task cancelled by user.");
+            tracing::info!("Task cancelled by user.");
             return Ok(()); // exit early
         }
 
-        log::info!(
+        tracing::info!(
             "Remove empty folders setting is {}, so removing empty folders",
             remove_empty_folders_setting
         );
@@ -450,7 +446,7 @@ fn sort_by_rule_folder_name(
     }
 
     if task.is_cancelled() {
-        log::info!("Task cancelled by user.");
+        tracing::info!("Task cancelled by user.");
         return Ok(()); // exit early
     }
 
@@ -462,12 +458,12 @@ fn sort_by_rule_folder_name(
     let result_meta = get_all_meta_file_rules(&hits);
     save_results_to_project_metadata(proj, result_meta);
 
-    log::info!("BinYars execution complete!");
+    tracing::info!("BinYars execution complete!");
     Ok(())
 }
 
 fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHits]) {
-    log::info!("Mapping Files to Project Folders");
+    tracing::info!("Mapping Files to Project Folders");
     let total = hits.len();
     let counter = Arc::new(AtomicUsize::new(0));
     hits.iter().for_each(|h| {
@@ -481,7 +477,7 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
             if let Some(next_folder) = build_path_get_next_folder(h, &path, &counts) {
                 // Stop if folder already in path (avoid infinite loop)
                 if path.contains(&next_folder) {
-                    log::debug!(
+                    tracing::debug!(
                         "  {} Folder Already Exists {:?}",
                         h.file_id,
                         h.get_bn_folders()
@@ -491,7 +487,7 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
                 // capture folder to path
                 path.push(next_folder.clone());
             } else {
-                log::debug!(
+                tracing::debug!(
                     "  {} No more folders to add {:?}",
                     h.file_id,
                     h.get_bn_folders()
@@ -501,7 +497,7 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
 
             // Stop when we’ve collected all folders for this hit
             if path.len() == h.get_bn_folders().len() {
-                log::debug!(
+                tracing::debug!(
                     "  {} All Folders Collected {:?}",
                     h.file_id,
                     h.get_bn_folders()
@@ -510,12 +506,12 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
             }
         }
 
-        log::debug!("  Final path for file {}: {:?}", h.file_id, path);
+        tracing::debug!("  Final path for file {}: {:?}", h.file_id, path);
         let folder_id = create_project_folder_path(h, proj, path, &h.file_id);
 
         if let Some(file) = proj.file_by_id(&h.file_id) {
             if let Some(_) = proj.folder_by_id(&folder_id) {
-                log::info!(
+                tracing::info!(
                     "  Moving {} -> {}",
                     file.name(),
                     proj.folder_by_id(&folder_id).unwrap().name().as_str()
@@ -529,7 +525,7 @@ fn move_files_into_folders(task: &BackgroundTask, proj: &Project, hits: &[FileHi
                 }
             }
         } else {
-            log::error!("  File {} not found to move", &h.file_id);
+            tracing::error!("  File {} not found to move", &h.file_id);
         }
 
         // update progress counter
@@ -547,10 +543,10 @@ fn save_results_to_project_metadata(proj: &Project, meta_results: HashMap<String
         Ok(rh) => {
             let metadata: Ref<Metadata> = From::from(rh);
             proj.store_metadata(PLUGIN_NAME, &metadata);
-            log::info!("Saved metadata results to project under '{}'", PLUGIN_NAME);
+            tracing::info!("Saved metadata results to project under '{}'", PLUGIN_NAME);
         }
         Err(e) => {
-            log::error!("Failed to serialize metadata results: {}", e);
+            tracing::error!("Failed to serialize metadata results: {}", e);
         }
     }
 }
@@ -577,7 +573,7 @@ fn remove_empty_folders(task: &BackgroundTask, proj: &Project) {
     let total = folder_ids.len();
     let counter = Arc::new(AtomicUsize::new(0));
 
-    log::info!("Deleting Empty Folders");
+    tracing::info!("Deleting Empty Folders");
     folder_ids.into_iter().for_each(|id| {
         delete_folder_walk(proj, &id);
 
@@ -597,8 +593,8 @@ fn delete_folder_walk(proj: &Project, folder_id: &str) {
         {
             let f = folder.as_ref();
             match proj.delete_folder(f) {
-                Ok(_) => log::info!("  Deleted folder {} ({})", f.name(), f.id()),
-                Err(_) => log::error!("  Error deleting folder {} ({})", f.name(), f.id()),
+                Ok(_) => tracing::info!("  Deleted folder {} ({})", f.name(), f.id()),
+                Err(_) => tracing::error!("  Error deleting folder {} ({})", f.name(), f.id()),
             }
             if let Some(parent) = f.parent() {
                 delete_folder_walk(proj, &parent.id());
@@ -620,13 +616,13 @@ fn move_unmatched_file_to_root_dir(proj: &Project, hits: &[FileHits]) {
         })
         .collect();
 
-    log::info!("Moving Unmatched Files");
+    tracing::info!("Moving Unmatched Files");
     for file in proj.files().into_iter() {
         let fullpath = file.path_on_disk().unwrap();
         // Don't move the bndb files as they will be handled by a different function
         if !is_database(fullpath.as_path()) {
             if !hit_ids.contains(file.id().as_str()) {
-                log::info!("  {} to root dir", file.id());
+                tracing::info!("  {} to root dir", file.id());
                 file.set_folder(None);
             }
         }
@@ -634,7 +630,7 @@ fn move_unmatched_file_to_root_dir(proj: &Project, hits: &[FileHits]) {
 }
 
 fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project) {
-    log::info!("Moving BNDB files");
+    tracing::info!("Moving BNDB files");
 
     let bndb_files = get_project_bndb_files(proj);
 
@@ -646,10 +642,10 @@ fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project
             return; // silently stop this worker
         }
 
-        log::info!("  Found BNDB file {}", id);
+        tracing::info!("  Found BNDB file {}", id);
 
         let Some(bndb_id) = proj.file_by_id(&id).map(|f| f.id()) else {
-            log::error!("    Failed to get BNDB project file");
+            tracing::error!("    Failed to get BNDB project file");
             return;
         };
 
@@ -657,28 +653,28 @@ fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project
         let fullpath = match proj.file_by_id(&bndb_id).and_then(|f| f.path_on_disk()) {
             Some(p) => p,
             None => {
-                log::error!("    Failed to get BNDB file path on disk");
+                tracing::error!("    Failed to get BNDB file path on disk");
                 return;
             }
         };
 
         let Some(path_str) = fullpath.as_path().to_str() else {
-            log::error!("    Failed to convert BNDB path to string");
+            tracing::error!("    Failed to convert BNDB path to string");
             return;
         };
 
-        log::debug!("    BNDB file path on disk: {}", path_str);
+        tracing::debug!("    BNDB file path on disk: {}", path_str);
 
         let Ok(Some(original_file_id)) = get_original_file_id(path_str) else {
-            log::error!("    Failed to get original file id from BNDB");
+            tracing::error!("    Failed to get original file id from BNDB");
             return;
         };
 
-        log::debug!("    Original file id: {}", original_file_id);
+        tracing::debug!("    Original file id: {}", original_file_id);
 
         // Get binary file again (short-lived borrow)
         let Some(binary_file_id) = proj.file_by_id(&original_file_id).map(|f| f.id()) else {
-            log::error!(
+            tracing::error!(
                 "    Could not find binary project file matching id: {}",
                 original_file_id
             );
@@ -702,14 +698,14 @@ fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project
             match (bndb_path, binary_path) {
                 (Some(a), Some(b)) => (a, b),
                 _ => {
-                    log::error!("    Failed to get project paths");
+                    tracing::error!("    Failed to get project paths");
                     return;
                 }
             }
         };
 
         if binary_project_path != bndb_project_path {
-            log::debug!(
+            tracing::debug!(
                 "    Binary Project Path {} does NOT match BNDB Project Path {}",
                 binary_project_path,
                 bndb_project_path
@@ -719,13 +715,13 @@ fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project
                 .file_by_id(&binary_file_id)
                 .and_then(|f| f.folder().map(|fld| fld.id()))
             else {
-                log::error!("    Binary file has no folder associated with it");
+                tracing::error!("    Binary file has no folder associated with it");
                 return;
             };
 
             if let Some(bndb_file) = proj.file_by_id(&bndb_id) {
                 bndb_file.set_folder(proj.folder_by_id(&binary_folder_id).as_deref());
-                log::info!(
+                tracing::info!(
                     "    BinaryNinja DB file {} moved to folder {}",
                     bndb_file.name(),
                     proj.folder_by_id(&binary_folder_id)
@@ -734,7 +730,7 @@ fn move_bndb_files_to_binary_file_location(task: &BackgroundTask, proj: &Project
                 );
             }
         } else {
-            log::info!("    BinaryNinja DB file {} already in correct folder", id);
+            tracing::info!("    BinaryNinja DB file {} already in correct folder", id);
             return;
         }
 
@@ -768,7 +764,7 @@ fn create_project_folder_path<'a>(
     file_id: &str,
 ) -> String {
     let mut pid = String::new();
-    log::debug!("Path for {} : {}", file_id, path.join("/"));
+    tracing::debug!("Path for {} : {}", file_id, path.join("/"));
     path.into_iter().for_each(|p| {
         if !p.is_empty() {
             if let Some(folder_id) = get_project_folder_id(proj, &p, &pid) {
@@ -777,7 +773,7 @@ fn create_project_folder_path<'a>(
                 match proj.create_folder(proj.folder_by_id(&pid).as_deref(), &p, "") {
                     Ok(cf) => pid = cf.id(),
                     Err(_) => {
-                        log::error!("Error creating project folder");
+                        tracing::error!("Error creating project folder");
                     }
                 }
             }
@@ -792,7 +788,7 @@ fn create_project_folder_path<'a>(
                                 &temp_folder.description(),
                                 &hit.desc
                             ));
-                            log::debug!(
+                            tracing::debug!(
                                 "Folder {} Description set to {}",
                                 pid,
                                 temp_folder.description()
@@ -824,7 +820,7 @@ fn get_project_folder_id(proj: &Project, name: &str, parent_id: &str) -> Option<
         .map(|folder| folder.id());
 
     if result.is_none() {
-        log::debug!("Parent {} not found for {}", parent_id, name);
+        tracing::debug!("Parent {} not found for {}", parent_id, name);
     }
 
     result
@@ -836,7 +832,7 @@ fn walk_folder_path(proj: &Project, pid: String, path: &mut Vec<String>) {
         if let Some(parent) = folder.parent() {
             walk_folder_path(proj, parent.id(), path);
         } else {
-            log::debug!("Reversed path: {}", path.join("/"));
+            tracing::debug!("Reversed path: {}", path.join("/"));
         }
     }
 }
