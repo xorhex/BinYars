@@ -43,12 +43,25 @@ impl Pattern {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Action {
+    pub name: String,
+    pub code: String,
+}
+
+impl Action {
+    pub fn new(name: String, code: String) -> Self {
+        Self { name, code }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MetaRule {
     pub rule: String,
     pub desc: String,
     pub console: Vec<HashMap<String, String>>,
     pub folder: String,
     pub settings: Vec<HashMap<String, Option<String>>>,
+    pub action: Option<Action>,
     pub identifiers: Vec<Pattern>,
 }
 
@@ -59,6 +72,7 @@ impl MetaRule {
         folder: String,
         settings: Vec<HashMap<String, Option<String>>>,
         console: Vec<HashMap<String, String>>,
+        action: Option<Action>,
         identifiers: Vec<Pattern>,
     ) -> Self {
         Self {
@@ -67,6 +81,7 @@ impl MetaRule {
             folder,
             settings,
             console,
+            action,
             identifiers,
         }
     }
@@ -370,6 +385,10 @@ impl Scanner {
                                     .as_str(),
                             ),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
+                            parse_action(
+                                get_metadata_string_field(h.metadata(), "BNTrigger")
+                                    .unwrap_or_default(),
+                            ),
                             get_patterns(h.patterns(), pattern_limit),
                         )
                     })
@@ -445,6 +464,10 @@ impl Scanner {
                                     .as_str(),
                             ),
                             filter_logs_by_rule(Arc::clone(&logs), &h.identifier().to_string()),
+                            parse_action(
+                                get_metadata_string_field(h.metadata(), "BNTrigger")
+                                    .unwrap_or_default(),
+                            ),
                             get_patterns(h.patterns(), pattern_limit),
                         )
                     })
@@ -616,6 +639,30 @@ fn get_metadata_string_field(meta: yara_x::Metadata, field_name: &str) -> Option
         }
     }
     None
+}
+
+fn parse_action(value: String) -> Option<Action> {
+    // Reject empty input
+    if value.is_empty() {
+        return None;
+    }
+
+    let parts: Vec<&str> = value.split('|').collect();
+
+    // Must be exactly two parts
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let name = parts[0].trim();
+    let code = parts[1].trim();
+
+    // Reject empty name or code
+    if name.is_empty() || code.is_empty() {
+        return None;
+    }
+
+    Some(Action::new(name.to_string(), code.to_string()))
 }
 
 pub fn count_folders(hits: &[FileHits], base_folders: Vec<String>) -> HashMap<String, usize> {
