@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use binaryninja::background_task::BackgroundTask;
-use log::info;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString};
@@ -170,7 +169,7 @@ impl Rules {
     }
 
     pub fn compile_and_save(&self, task: &BackgroundTask) -> anyhow::Result<()> {
-        info!("Compiling yara-x rules in {:?}", self.rule_folder);
+        tracing::info!("Compiling yara-x rules in {:?}", self.rule_folder);
         let files: Vec<String> = WalkDir::new(&self.rule_folder)
             .into_iter()
             .filter_map(Result::ok)
@@ -186,7 +185,7 @@ impl Rules {
                 File::open(&f).map_err(|e| anyhow::anyhow!("Failed to open file {}: {}", f, e))?;
 
             if task.is_cancelled() {
-                log::info!("Task cancelled by user.");
+                tracing::info!("Task cancelled by user.");
                 return Ok(()); // exit early
             }
 
@@ -199,34 +198,34 @@ impl Rules {
 
             match compiler.add_source(source_code) {
                 Ok(_) => {
-                    log::info!("File {} compiled", &f);
+                    tracing::info!("File {} compiled", &f);
                 }
                 Err(e) => {
-                    log::error!("Error compiling rule {}\n{}", &f, e);
+                    tracing::error!("Error compiling rule {}\n{}", &f, e);
                 }
             }
 
             if task.is_cancelled() {
-                log::info!("Task cancelled by user.");
+                tracing::info!("Task cancelled by user.");
                 return Ok(()); // exit early
             }
         }
 
         if task.is_cancelled() {
-            log::info!("Task cancelled by user.");
+            tracing::info!("Task cancelled by user.");
             return Ok(()); // exit early
         }
 
         let mut built_rules = compiler.build();
-        log::info!("YaraX rules built");
+        tracing::info!("YaraX rules built");
 
         if task.is_cancelled() {
-            log::info!("Task cancelled by user.");
+            tracing::info!("Task cancelled by user.");
             return Ok(()); // exit early
         }
 
         let _ = self.save(&mut built_rules);
-        log::info!("YaraX rules saved");
+        tracing::info!("YaraX rules saved");
 
         Ok(())
     }
@@ -235,7 +234,7 @@ impl Rules {
         let fullname = match self.save_as.to_str() {
             Some(name) => name,
             None => {
-                log::error!("Invalid save path (non-UTF8)");
+                tracing::error!("Invalid save path (non-UTF8)");
                 return Err(BinYarsError::FileError {
                     source: std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
@@ -246,21 +245,21 @@ impl Rules {
         };
 
         let mut file = File::create(fullname).map_err(|e| {
-            log::error!("Unable to create file: {}", e);
+            tracing::error!("Unable to create file: {}", e);
             BinYarsError::FileError { source: e }
         })?;
 
         let bytes = rules.serialize().map_err(|e| {
-            log::error!("Error serializing YaraX rules: {}", e);
+            tracing::error!("Error serializing YaraX rules: {}", e);
             BinYarsError::YaraRulesDeserilizationError { source: e }
         })?;
 
         file.write_all(&bytes).map_err(|e| {
-            log::error!("Error writing serialized rules to {}: {}", fullname, e);
+            tracing::error!("Error writing serialized rules to {}: {}", fullname, e);
             BinYarsError::FileError { source: e }
         })?;
 
-        info!("Compiled YaraX rules written successfully to {}", fullname);
+        tracing::info!("Compiled YaraX rules written successfully to {}", fullname);
         Ok(())
     }
 
@@ -276,18 +275,18 @@ impl Rules {
             })?;
 
         let mut file = File::open(fullname).map_err(|e| {
-            log::error!("Error opening rule file ({}) : {}", fullname, e);
+            tracing::error!("Error opening rule file ({}) : {}", fullname, e);
             BinYarsError::FileError { source: e }
         })?;
 
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).map_err(|e| {
-            log::error!("Error reading file {}: {}", fullname, e);
+            tracing::error!("Error reading file {}: {}", fullname, e);
             BinYarsError::FileError { source: e }
         })?;
 
         yara_x::Rules::deserialize(buffer).map_err(|e| {
-            log::error!("Error loading rules: {}", e);
+            tracing::error!("Error loading rules: {}", e);
             BinYarsError::YaraRulesDeserilizationError { source: e }
         })
     }
@@ -300,7 +299,7 @@ impl Rules {
         match compiler.add_source(source_code) {
             Ok(_) => "".to_string(),
             Err(e) => {
-                log::error!("Error compiling rule\n{}", e);
+                tracing::error!("Error compiling rule\n{}", e);
                 e.to_string()
             }
         }
@@ -339,10 +338,10 @@ impl Scanner {
         // Extract module information from the scan results
         let mut module_info_map: HashMap<String, Option<String>> = HashMap::new();
 
-        log::info!("Rust Iterating Over Module Outputs");
+        tracing::info!("Rust Iterating Over Module Outputs");
         results.module_outputs().for_each(|(name, data)| {
-            log::info!("Module: {}", name);
-            log::info!("{:?}", data);
+            tracing::info!("Module: {}", name);
+            tracing::info!("{:?}", data);
             module_info_map.insert(name.to_string(), Some(format!("{:?}", data)));
         });
         match serde_json::to_string(&module_info_map) {
@@ -364,7 +363,7 @@ impl Scanner {
                     logs.push(parsed);
                 }
                 Err(e) => {
-                    log::debug!("   Failed to parse console log message '{}': {}", msg, e);
+                    tracing::debug!("   Failed to parse console log message '{}': {}", msg, e);
                 }
             },
         );
@@ -393,7 +392,7 @@ impl Scanner {
                         )
                     })
                     .collect::<Vec<MetaRule>>();
-                log::info!(
+                tracing::info!(
                     "Scanner found: {:?}",
                     results
                         .iter()
@@ -407,7 +406,7 @@ impl Scanner {
                 }
             }
             Err(e) => {
-                log::error!("Error scanning bytes: {}", e);
+                tracing::error!("Error scanning bytes: {}", e);
                 String::new()
             }
         }
@@ -443,7 +442,7 @@ impl Scanner {
                     logs.push(parsed);
                 }
                 Err(e) => {
-                    log::debug!("   Failed to parse console log message '{}': {}", msg, e);
+                    tracing::debug!("   Failed to parse console log message '{}': {}", msg, e);
                 }
             },
         );
@@ -472,7 +471,7 @@ impl Scanner {
                         )
                     })
                     .collect::<Vec<MetaRule>>();
-                log::debug!(
+                tracing::debug!(
                     "Scanner found: {:?} for {}",
                     result
                         .iter()
@@ -484,7 +483,7 @@ impl Scanner {
                 Ok(FileHits::new(file_id.clone(), result))
             }
             Err(e) => {
-                log::error!("Error scanning file {}: {}", file_name, e);
+                tracing::error!("Error scanning file {}: {}", file_name, e);
                 Err(BinYarsError::YaraScanError { source: e })
             }
         }
@@ -503,7 +502,7 @@ pub fn parse_console_log_message(msg: String) -> Result<HashMap<String, String>>
 
     // Must start with "TB|"
     if !trimmed.starts_with("BN|") {
-        log::info!("Console Message: {}", trimmed);
+        tracing::info!("Console Message: {}", trimmed);
         return Err(anyhow!("Message does not start with 'BN|'"));
     }
 
@@ -558,7 +557,7 @@ pub fn parse_bn_settings(input: &str) -> Vec<HashMap<String, Option<String>>> {
             1 => {
                 // Only key, no value
                 map.insert(parts[0].trim().to_string(), None);
-                log::debug!("   Found Setting - {}", parts[0].trim().to_string());
+                tracing::debug!("   Found Setting - {}", parts[0].trim().to_string());
             }
             2 => {
                 // Key-value pair
@@ -566,7 +565,7 @@ pub fn parse_bn_settings(input: &str) -> Vec<HashMap<String, Option<String>>> {
                     parts[0].trim().to_string(),
                     Some(parts[1].trim().to_string()),
                 );
-                log::debug!(
+                tracing::debug!(
                     "   Found Setting - {} : {:?}",
                     parts[0].trim().to_string(),
                     Some(parts[1].trim().to_string())
@@ -594,10 +593,10 @@ fn filter_logs_by_rule(
             // Only keep if the "rule" key matches
             if map.get("rule").map(|v| v == rule_name).unwrap_or(false) {
                 map.remove("rule"); // remove the "rule" key
-                log::debug!("   Rule name matched value: {}", rule_name);
+                tracing::debug!("   Rule name matched value: {}", rule_name);
                 Some(map)
             } else {
-                log::debug!("   No rule name matched value: {}", rule_name);
+                tracing::debug!("   No rule name matched value: {}", rule_name);
                 None
             }
         })
@@ -718,7 +717,7 @@ pub unsafe extern "C" fn scan_bytes(
     pattern_limit: u64,
 ) -> *const c_char {
     if ptr.is_null() || folder.is_null() || compiled_rules_file_name.is_null() {
-        log::error!("A parameter is null\n\n");
+        tracing::error!("A parameter is null\n\n");
         return CString::new("").unwrap().into_raw();
     }
 
@@ -726,7 +725,7 @@ pub unsafe extern "C" fn scan_bytes(
     let folder_str = match unsafe { CStr::from_ptr(folder).to_str() } {
         Ok(s) => s.to_string(),
         Err(_) => {
-            log::error!("folder is none\n\n");
+            tracing::error!("folder is none\n\n");
             return CString::new("").unwrap().into_raw();
         }
     };
@@ -734,7 +733,7 @@ pub unsafe extern "C" fn scan_bytes(
     let compiled_rules_str = match unsafe { CStr::from_ptr(compiled_rules_file_name).to_str() } {
         Ok(s) => s.to_string(),
         Err(_) => {
-            log::error!("compiled rules is none\n\n");
+            tracing::error!("compiled rules is none\n\n");
             return CString::new("").unwrap().into_raw();
         }
     };
@@ -744,12 +743,12 @@ pub unsafe extern "C" fn scan_bytes(
 
     match rules.load() {
         Ok(yrules) => {
-            log::info!("Scanning Bytes\n\n");
+            tracing::info!("Scanning Bytes\n\n");
             let results = Scanner::scan_bytes(yrules, slice, pattern_limit);
             CString::new(results).unwrap().into_raw()
         }
         Err(_) => {
-            log::error!("Error loading rules");
+            tracing::error!("Error loading rules");
             CString::new("").unwrap().into_raw()
         }
     }
@@ -763,7 +762,7 @@ pub unsafe extern "C" fn scan_rule_against_bytes(
     pattern_limit: u64,
 ) -> *const c_char {
     if ptr.is_null() || rule.is_null() {
-        log::error!("A parameter is null\n\n");
+        tracing::error!("A parameter is null\n\n");
         return CString::new("").unwrap().into_raw();
     }
 
@@ -772,7 +771,7 @@ pub unsafe extern "C" fn scan_rule_against_bytes(
     let rule_str = match unsafe { CStr::from_ptr(rule).to_str() } {
         Ok(s) => s.to_string(),
         Err(e) => {
-            log::error!("Error loading rule: {}\n\n", e);
+            tracing::error!("Error loading rule: {}\n\n", e);
             return CString::new("").unwrap().into_raw();
         }
     };
@@ -784,12 +783,12 @@ pub unsafe extern "C" fn scan_rule_against_bytes(
     match compiler.add_source(source_code) {
         Ok(_) => {
             let built_rules = compiler.build();
-            log::info!("Scanning Bytes\n\n");
+            tracing::info!("Scanning Bytes\n\n");
             let results = Scanner::scan_bytes(built_rules, slice, pattern_limit);
             CString::new(results).unwrap().into_raw()
         }
         Err(e) => {
-            log::error!("Error compiling rule\n{}", e);
+            tracing::error!("Error compiling rule\n{}", e);
             return CString::new("").unwrap().into_raw();
         }
     }
@@ -798,7 +797,7 @@ pub unsafe extern "C" fn scan_rule_against_bytes(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn module_info(bytes: *const u8, len: usize) -> *const c_char {
     if bytes.is_null() {
-        log::error!("bytes parameter is null\n\n");
+        tracing::error!("bytes parameter is null\n\n");
         return CString::new("").unwrap().into_raw();
     }
 
@@ -811,7 +810,7 @@ pub unsafe extern "C" fn module_info(bytes: *const u8, len: usize) -> *const c_c
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn compile(rule: *const c_char) -> *const c_char {
     if rule.is_null() {
-        log::error!("Rule parameter is null\n\n");
+        tracing::error!("Rule parameter is null\n\n");
         return CString::new("").unwrap().into_raw();
     }
 
@@ -819,7 +818,7 @@ pub unsafe extern "C" fn compile(rule: *const c_char) -> *const c_char {
     let rule_str = match unsafe { CStr::from_ptr(rule).to_str() } {
         Ok(s) => s.to_string(),
         Err(e) => {
-            log::error!("Error loading rule: {}\n\n", e);
+            tracing::error!("Error loading rule: {}\n\n", e);
             return CString::new("").unwrap().into_raw();
         }
     };
@@ -831,7 +830,7 @@ pub unsafe extern "C" fn compile(rule: *const c_char) -> *const c_char {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn format(rule: *const c_char) -> *const c_char {
     if rule.is_null() {
-        log::error!("Rule parameter is null\n\n");
+        tracing::error!("Rule parameter is null\n\n");
         return CString::new("").unwrap().into_raw();
     }
 
@@ -839,7 +838,7 @@ pub unsafe extern "C" fn format(rule: *const c_char) -> *const c_char {
     let rule_str = match unsafe { CStr::from_ptr(rule).to_str() } {
         Ok(s) => s.to_string(),
         Err(e) => {
-            log::error!("Error loading rule: {}\n\n", e);
+            tracing::error!("Error loading rule: {}\n\n", e);
             return CString::new("").unwrap().into_raw();
         }
     };
@@ -885,7 +884,7 @@ pub extern "C" fn precompile_and_save_ffi(
 ) -> i32 {
     // Safety: check for null pointers
     if plugin_name.is_null() || rule_folder.is_null() || yara_compiled_file_name.is_null() {
-        log::error!("Null pointer passed to precompile_and_save_ffi");
+        tracing::error!("Null pointer passed to precompile_and_save_ffi");
         return 0;
     }
 
@@ -908,11 +907,11 @@ pub extern "C" fn precompile_and_save_ffi(
 
     match result {
         Ok(_) => {
-            log::info!("{}: Compilation successful", plugin_name_str);
+            tracing::info!("{}: Compilation successful", plugin_name_str);
             1
         }
         Err(e) => {
-            log::error!("Error compiling {}: {:?}", plugin_name_str, e);
+            tracing::error!("Error compiling {}: {:?}", plugin_name_str, e);
             0
         }
     }
